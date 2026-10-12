@@ -1,0 +1,2246 @@
+<!DOCTYPE html>
+<html lang="uk" data-theme="military">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>KYIV OSINT RADAR v16.3</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<style>
+:root, [data-theme="military"]{
+  --bg:#050a10; --panel:rgba(8,16,24,.92); --panel-solid:#0b1520;
+  --text:#e8f0f5; --muted:#7a8f9e; --accent:#22d3ee; --accent-soft:rgba(34,211,238,.15);
+  --danger:#ef4444; --ok:#34d399; --warn:#fbbf24;
+  --border:rgba(34,211,238,.18); --header-bg:rgba(5,10,16,.94);
+  --btn-bg:rgba(12,22,32,.9); --btn-border:rgba(148,163,184,.22);
+  --glow:0 0 12px rgba(34,211,238,.35);
+  --radius:12px; --font:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --safe-top:env(safe-area-inset-top,0px); --safe-bottom:env(safe-area-inset-bottom,0px);
+  --card-h:0px;
+}
+body.card-on{--card-h:132px}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;width:100%;overflow:hidden;font-family:var(--font-ui);background:var(--bg);color:var(--text);-webkit-tap-highlight-color:transparent}
+#app{position:absolute;inset:0;display:flex;flex-direction:column}
+.header{min-height:42px;background:var(--header-bg);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:6px 12px;padding-top:calc(6px + var(--safe-top));z-index:1000;backdrop-filter:blur(16px);flex:0 0 auto;font-size:12px;gap:8px}
+.logo{font-weight:800;letter-spacing:.06em;font-size:11px;display:flex;align-items:center;gap:7px;white-space:nowrap;font-family:var(--font)}
+.logo-icon{font-size:14px;filter:drop-shadow(0 0 6px var(--accent))}
+.header-right{display:flex;align-items:center;gap:8px;flex:1;justify-content:flex-end;min-width:0}
+.search-box{display:flex;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:999px;overflow:hidden;height:32px;flex:1;max-width:260px;min-width:100px}
+.search-box input{background:transparent;border:0;color:var(--text);padding:0 12px;font-size:12px;width:100%;outline:none;font-family:var(--font-ui)}
+.search-box input::placeholder{color:var(--muted)}
+.search-box button{background:transparent;border:0;color:var(--accent);width:34px;height:32px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.lang-btn-header{background:var(--btn-bg);border:1px solid var(--border);color:var(--accent);padding:0;border-radius:999px;font-size:11px;line-height:1;cursor:pointer;font-weight:800;min-width:34px;width:34px;height:32px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;font-family:var(--font)}
+.lang-btn-header.en{color:var(--ok)}
+.status{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap;font-family:var(--font);letter-spacing:.04em}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok);transition:background .3s,box-shadow .3s}
+.status-dot.err{background:var(--danger);box-shadow:0 0 10px var(--danger)}
+.status-dot.warn{background:var(--warn);box-shadow:0 0 10px var(--warn)}
+.ballistic-timer{display:none;padding:0 10px;height:32px;border-radius:999px;align-items:center;justify-content:center;font-family:var(--font);font-weight:900;font-size:12px;line-height:1;color:#fff;background:#7c2d12;border:2px solid #fca5a5;box-shadow:0 0 12px rgba(220,38,38,.7);letter-spacing:.04em;flex:0 0 auto;min-width:66px;white-space:nowrap;animation:btPulse 1s ease-in-out infinite}
+.ballistic-timer.show{display:inline-flex}
+@keyframes btPulse{0%,100%{box-shadow:0 0 12px rgba(220,38,38,.7);transform:scale(1)}50%{box-shadow:0 0 24px rgba(220,38,38,1);transform:scale(1.04)}}
+.search-results{position:absolute;top:calc(48px + var(--safe-top));right:10px;left:10px;z-index:5000;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);max-width:400px;margin-left:auto;max-height:260px;overflow-y:auto;width:280px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.55)}
+.search-results.show{display:block}
+.search-item{padding:9px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid rgba(148,163,184,.12)}
+.search-item:hover,.search-item.active{background:rgba(59,130,246,.18)}
+.search-item .name{font-weight:700;color:var(--text)}
+.search-item .addr{font-size:10px;color:var(--muted);margin-top:2px}
+#map{flex:1;min-height:0;width:100%;background:var(--bg)}
+[data-theme="military"] #map{background:#dbe4ee}
+.top-alert{position:absolute;top:calc(48px + var(--safe-top) + 8px);left:6px;right:6px;z-index:4600;border-radius:10px;overflow:hidden;display:none;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+.top-alert.show{display:block;animation:alertIn .3s ease-out}
+@keyframes alertIn{from{transform:translateY(-8px);opacity:0}to{transform:translateY(0);opacity:1}}
+.top-alert.ballistic{background:linear-gradient(90deg,#7f1d1d,#dc2626,#7f1d1d);color:#fff;animation:bbPulse .6s ease-in-out infinite;border:1px solid #fca5a5}
+@keyframes bbPulse{0%,100%{background:linear-gradient(90deg,#7f1d1d,#dc2626,#7f1d1d)}50%{background:linear-gradient(90deg,#dc2626,#fca5a5,#dc2626)}}
+.top-alert.impact{background:linear-gradient(90deg,#7c2d12,#ea580c,#7c2d12);color:#fff;border:1px solid #fdba74}
+.top-alert.falling{background:linear-gradient(90deg,#78350f,#f59e0b,#78350f);color:#fff;border:1px solid #fcd34d}
+.top-alert.shot{background:linear-gradient(90deg,#14532d,#16a34a,#14532d);color:#fff;border:1px solid #86efac}
+.top-alert.fire{background:linear-gradient(90deg,#7c2d12,#f97316,#7c2d12);color:#fff;border:1px solid #fdba74}
+.top-alert-inner{padding:9px 34px 9px 12px;display:flex;align-items:center;gap:10px;font-weight:800;font-size:.86rem;line-height:1.25}
+.top-alert-icon{font-size:1.4rem;flex-shrink:0;line-height:1}
+.top-alert-body{flex:1;min-width:0}
+.top-alert-title{font-weight:800;font-size:.86rem}
+.top-alert-place{font-size:.78rem;font-weight:700;margin-top:2px;opacity:.95}
+.top-alert-meta{font-size:.68rem;font-weight:700;opacity:.85;margin-top:2px}
+.top-alert-close{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.25);border:0;color:#fff;width:22px;height:22px;border-radius:50%;font-size:1rem;cursor:pointer;font-weight:700;padding:0}
+.mass-banner{position:absolute;top:calc(36px + var(--safe-top) + 6px);left:6px;right:6px;z-index:4620;border-radius:10px;overflow:hidden;display:none;box-shadow:0 6px 24px rgba(0,0,0,.6);background:linear-gradient(135deg,#4c1d95,#7c3aed,#4c1d95);border:1px solid #c4b5fd;color:#fff}
+.mass-banner.show{display:block}
+.mass-banner-inner{padding:6px 30px 6px 10px;display:flex;align-items:center;gap:10px;font-size:.72rem;line-height:1.2}
+.mass-banner-icon{font-size:1.5rem;flex-shrink:0}
+.mass-banner-body{flex:1;min-width:0}
+.mass-banner-title{font-weight:800;font-size:.86rem}
+.mass-banner-line{font-size:.74rem;font-weight:700;margin-top:3px;opacity:.95}
+.mass-banner-line b{color:#fde047}
+.mass-banner-close{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.3);border:0;color:#fff;width:22px;height:22px;border-radius:50%;font-size:1rem;cursor:pointer;padding:0}
+.strategic-panel{position:absolute;top:calc(36px + var(--safe-top) + 6px);left:6px;right:6px;z-index:4550;background:rgba(15,23,42,.95);border:1px solid rgba(250,204,21,.5);border-radius:10px;padding:8px 12px;display:none;box-shadow:0 6px 24px rgba(0,0,0,.5);font-size:.72rem;max-height:30vh;overflow-y:auto}
+.strategic-panel.show{display:block}
+.strategic-panel-title{font-weight:800;color:#facc15;margin-bottom:6px;font-size:.78rem;display:flex;justify-content:space-between;align-items:center}
+.strategic-panel-close{background:0;border:0;color:#facc15;font-size:1.1rem;cursor:pointer;padding:0 4px;line-height:1}
+.strategic-panel-item{color:#e2e8f0;padding:3px 0;border-bottom:1px solid rgba(148,163,184,.15);display:flex;align-items:flex-start;gap:6px}
+.strategic-panel-item .s-ico{flex-shrink:0}
+.strategic-panel-item .s-text{flex:1;min-width:0}
+.strategic-panel-summary{color:#fca5a5;font-weight:800;margin-top:6px;padding-top:6px;border-top:1px solid rgba(220,38,38,.4);font-size:.7rem}
+.hud-bottom{position:absolute;bottom:calc(10px + var(--safe-bottom) + var(--card-h));left:0;right:0;z-index:1200;padding:0 8px;pointer-events:none;transition:bottom .28s}
+.hud-bottom>*{pointer-events:auto}
+.btn-row{display:flex;gap:4px;overflow-x:auto;padding:5px 6px;background:var(--panel);border:1px solid var(--border);border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,.5);-webkit-overflow-scrolling:touch;scrollbar-width:none;width:100%;backdrop-filter:blur(14px)}
+.btn-row::-webkit-scrollbar{display:none}
+.btn-row button{border-radius:999px;min-width:38px;height:38px;flex:0 0 38px;border-color:transparent;background:transparent;transition:background .12s,transform .08s}
+.btn-row button:active{transform:scale(.92);background:rgba(34,211,238,.14)}
+.btn-row button.on{background:var(--accent-soft);border-color:rgba(34,211,238,.5)}
+button{background:var(--btn-bg);border:1px solid var(--btn-border);color:var(--text);padding:0;border-radius:var(--radius);font-size:.95rem;line-height:1;cursor:pointer;font-weight:700;min-width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;transition:border-color .15s,box-shadow .15s,background .15s,transform .08s}
+button:active{background:var(--accent-soft);transform:scale(.94)}
+button.danger{color:#fca5a5}
+button.on{border-color:var(--accent);box-shadow:var(--glow);background:var(--accent-soft)}
+button.siren-btn{color:var(--danger)}
+button.siren-btn.active{background:var(--danger)!important;color:#fff!important;animation:sirenFlash .35s ease-in-out infinite;border-color:var(--danger)}
+button.infra-btn.infrastructure{border-color:#3b82f6;color:#93c5fd}
+button.infra-btn.energy{border-color:var(--warn);color:var(--warn)}
+button.infra-btn.incidents{border-color:var(--danger);color:#fca5a5}
+button.sound-btn.muted{color:var(--danger);border-color:transparent;background:var(--btn-bg)}
+button.sound-btn.on{color:var(--ok)}
+button.mass-btn.on{color:#c4b5fd;border-color:#a78bfa}
+button.fs-btn.on{background:rgba(99,102,241,.9);color:#fff}
+button.visual-btn.on{color:#facc15;border-color:#facc15;box-shadow:0 0 10px rgba(250,204,21,.4)}
+@keyframes sirenFlash{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.8)}50%{box-shadow:0 0 0 6px rgba(220,38,38,0)}}
+.leaflet-popup-content-wrapper{background:var(--panel-solid);color:var(--text);border-radius:var(--radius);border:1px solid var(--border);box-shadow:0 8px 28px rgba(0,0,0,.55)}
+.leaflet-popup-tip{background:rgba(7,16,24,.97)}
+.leaflet-popup-content{margin:9px 11px;font-size:.75rem;line-height:1.4;max-width:250px}
+.leaflet-popup-close-button{color:#94a3b8!important;font-size:18px!important;padding:2px 6px!important}
+.popup-title{font-weight:700;font-size:.82rem;margin-bottom:4px;display:flex;align-items:center;gap:5px}
+.popup-meta{color:#94a3b8;font-size:.68rem}
+.popup-channels{margin-top:6px;padding-top:5px;border-top:1px solid rgba(148,163,184,.18);font-size:.66rem}
+.popup-channels .ch{display:inline-block;background:rgba(148,163,184,.2);color:#cbd5e1;padding:1px 6px;border-radius:8px;margin:2px 2px 2px 0;border:1px solid rgba(148,163,184,.3)}
+.popup-channels .ch.prio{background:rgba(251,191,36,.25);border-color:rgba(251,191,36,.5);color:#fbbf24}
+.popup-channels .ch.prio-l2{background:rgba(249,115,22,.28);border-color:rgba(251,146,60,.55);color:#fdba74}
+.popup-channels .ch.trusted{background:rgba(22,163,74,.25);border-color:rgba(134,239,172,.4);color:#86efac}
+.popup-remove-btn{margin-top:8px;width:100%;height:30px;font-size:.75rem;background:rgba(220,38,38,.25);border:1px solid rgba(248,113,113,.5);color:#fca5a5;border-radius:6px;cursor:pointer;font-weight:800}
+.popup-toggle-btn{margin-top:6px;width:100%;height:30px;font-size:.75rem;background:rgba(34,211,238,.2);border:1px solid rgba(34,211,238,.5);color:#67e8f9;border-radius:6px;cursor:pointer;font-weight:800}
+.popup-speed{background:rgba(234,88,12,.3);color:#fdba74;padding:3px 6px;border-radius:5px;font-weight:700;font-size:.72rem;display:inline-block;margin-top:4px;border:1px solid rgba(253,186,116,.5)}
+.popup-eta{background:rgba(220,38,38,.25);color:#fca5a5;padding:3px 6px;border-radius:5px;font-weight:700;font-size:.68rem;display:inline-block;margin-top:4px;border:1px solid rgba(248,113,113,.4)}
+.popup-alt{background:rgba(22,163,74,.25);color:#86efac;padding:3px 6px;border-radius:5px;font-weight:700;font-size:.68rem;display:inline-block;margin-top:4px;border:1px solid rgba(134,239,172,.4)}
+.popup-trail{margin-top:6px;padding:6px 8px;border-radius:5px;background:rgba(148,163,184,.12);border:1px dashed rgba(148,163,184,.5);font-size:.68rem;line-height:1.45;color:#cbd5e1;max-height:150px;overflow-y:auto}
+.popup-trail .pt-title{font-weight:700;color:#e2e8f0;margin-bottom:3px}
+.popup-trail .pt-point{display:flex;gap:5px;align-items:flex-start;margin:1px 0}
+.popup-trail .pt-num{flex-shrink:0;font-family:ui-monospace;color:#94a3b8;min-width:14px}
+.popup-trail .pt-place{flex:1;color:#e2e8f0}
+.popup-trail .pt-time{color:#94a3b8;font-size:.6rem;margin-left:3px}
+.popup-trail .pt-arrow{color:#fbbf24;font-weight:800}
+.threat-wrap{position:relative}
+.threat-rotate{position:absolute;inset:0;transform-origin:center center;will-change:transform;display:flex;align-items:center;justify-content:center}
+.threat-icon{display:flex;align-items:center;justify-content:center;transform-origin:center center;position:relative;animation:pulse 1.8s ease-in-out infinite;line-height:0}
+@keyframes pulse{0%,100%{filter:drop-shadow(0 0 3px rgba(0,0,0,.5));opacity:1}50%{filter:drop-shadow(0 0 8px rgba(251,191,36,.55));opacity:.92}}
+.threat-icon.falling{animation:fallingBlink .55s ease-in-out infinite}
+@keyframes fallingBlink{0%,100%{filter:drop-shadow(0 0 2px rgba(220,38,38,.9));opacity:1}50%{filter:drop-shadow(0 0 12px rgba(220,38,38,1));opacity:.35}}
+.threat-icon.threat-pulse{animation:threatPulse 1s ease-in-out infinite}
+@keyframes threatPulse{0%,100%{filter:drop-shadow(0 0 3px rgba(220,38,38,.9));opacity:1}50%{filter:drop-shadow(0 0 12px rgba(220,38,38,1));opacity:.55}}
+.threat-icon.ballistic-alarm{animation:ballisticAlarmPulse .5s ease-in-out infinite}
+@keyframes ballisticAlarmPulse{0%,100%{transform:scale(1);filter:drop-shadow(0 0 6px rgba(220,38,38,1))}50%{transform:scale(1.2);filter:drop-shadow(0 0 16px rgba(220,38,38,1));opacity:.75}}
+.threat-icon.priority-star::after{content:"⭐";position:absolute;top:-10px;left:-6px;font-size:11px;filter:drop-shadow(0 0 3px rgba(251,191,36,1))}
+.count-badge{position:absolute;right:-6px;top:-6px;height:14px;min-width:14px;padding:0 4px;border-radius:7px;background:#ea580c;color:#fff;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center;border:1px solid #fff;z-index:5}
+.confirm-badge{position:absolute;left:-6px;top:-6px;height:13px;min-width:13px;padding:0 3px;border-radius:7px;background:#16a34a;color:#fff;font-size:8px;font-weight:900;display:flex;align-items:center;justify-content:center;border:1px solid #fff;z-index:5}
+.confirm-badge.medium{background:#ca8a04}
+.confirm-badge.low{background:#dc2626}
+.confirm-badge.pending{background:#0ea5e9}
+.strat-wrap{position:relative}
+.strat-icon{width:32px;height:32px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 0 6px rgba(0,0,0,.6))}
+.strat-icon.training{animation:stratTrain 2.5s ease-in-out infinite}
+.strat-icon.active{animation:stratActive 1.2s ease-in-out infinite}
+@keyframes stratTrain{0%,100%{opacity:.6}50%{opacity:1}}
+@keyframes stratActive{0%,100%{filter:drop-shadow(0 0 6px rgba(250,204,21,.9))}50%{transform:scale(1.12)}}
+.strat-badge{position:absolute;right:-6px;top:-6px;height:14px;min-width:14px;padding:0 4px;border-radius:7px;background:#facc15;color:#1f2937;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center;border:1px solid #fff}
+.impact-simple{width:24px;height:24px;display:flex;align-items:center;justify-content:center}
+.err-banner{position:absolute;top:calc(36px + var(--safe-top));left:0;right:0;z-index:5000;background:#b91c1c;color:#fff;padding:8px 10px;font-size:.72rem;display:none}
+.err-banner.show{display:block}
+.err-banner .err-close{float:right;background:0;border:0;color:#fff;font-size:1.1rem;cursor:pointer;padding:0 4px}
+.toast{position:absolute;left:50%;top:calc(48px + var(--safe-top) + 12px);transform:translateX(-50%);z-index:2000;background:var(--panel-solid);color:var(--text);padding:9px 14px;border-radius:999px;border:1px solid var(--border);font-size:12px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;transition:opacity .25s;pointer-events:none;max-width:85vw;text-align:center}
+.toast.show{opacity:1}
+.leaflet-control-attribution{font-size:8px!important;background:var(--panel)!important;color:var(--muted)!important}
+.leaflet-control-zoom a{background:var(--btn-bg)!important;color:var(--text)!important;border:1px solid var(--border)!important;width:34px!important;height:34px!important;line-height:34px!important;font-size:16px!important;border-radius:10px!important;margin-bottom:4px!important}
+.leaflet-control-scale{background:rgba(7,16,24,.85)!important;border:1px solid rgba(34,211,238,.25)!important;border-radius:6px!important;padding:2px 6px!important;color:#e2e8f0!important}
+.settlement-marker{background:transparent;border:0}
+.settlement-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;border:1.5px solid #fff}
+.settlement-dot.city{background:#16a34a;width:11px;height:11px;border-width:2px}
+.infra-marker{background:transparent;border:0}
+.infra-bridge,.infra-energy,.infra-incident{width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1}
+.user-loc-marker{position:relative;width:22px;height:22px}
+.user-loc-dot{position:absolute;inset:0;border-radius:50%;background:#22d3ee;border:3px solid #fff;animation:userPulse 2s ease-in-out infinite}
+@keyframes userPulse{0%,100%{box-shadow:0 0 0 2px rgba(34,211,238,.6)}50%{box-shadow:0 0 0 8px rgba(34,211,238,.15)}}
+button.geo-btn.on{background:rgba(34,211,238,.9);color:#04202a;border-color:#22d3ee}
+.tw-info-label{
+  position:absolute;top:calc(100% + 11px);left:50%;transform:translateX(-50%);
+  background:transparent;border:0;box-shadow:none;padding:0;
+  white-space:nowrap;font-family:var(--font-ui);font-size:9px;font-weight:400;
+  line-height:1.25;text-align:center;pointer-events:none;z-index:100;
+}
+.tw-info-label *{
+  text-shadow:
+    0 0 2px rgba(255,255,255,.95),
+    0 0 4px rgba(255,255,255,.85),
+    0 1px 1.5px rgba(0,0,0,.5),
+    0 -1px 1.5px rgba(0,0,0,.4);
+}
+.tw-info-label .il-title{color:#000;font-weight:600;font-size:10px;letter-spacing:0;line-height:1.15}
+.tw-info-label .il-row{display:flex;gap:3px;justify-content:center;align-items:center;font-size:9px;margin-top:0;line-height:1.15;font-weight:400}
+.tw-info-label .il-row .sep{color:#000;opacity:.4;font-weight:400}
+.tw-info-label .il-spd{color:#000;font-weight:500}
+.tw-info-label .il-spd-table{color:#666;font-weight:400;font-style:italic}
+.tw-info-label .il-alt{color:#0d8a3a;font-weight:500}
+.tw-info-label .il-time{color:#5b21b6;font-weight:400}
+.tw-info-label .il-eta{color:#c1121f;font-weight:500}
+.tw-info-label .il-alt-drop{color:#c1121f;font-weight:700;animation:ilDropPulse 0.9s ease-in-out infinite}
+@keyframes ilDropPulse{0%,100%{opacity:1}50%{opacity:.35}}
+.tw-id-badge-mini{position:absolute;top:-3px;right:-14px;background:transparent;color:#fff;font-size:10px;font-weight:800;line-height:1;padding:2px 5px;border-radius:8px;min-width:22px;text-align:center;border:0;text-shadow:0 1px 2px rgba(0,0,0,.95),0 0 4px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.75);font-family:var(--font);pointer-events:none;z-index:6}
+.eta-label{color:#7c3aed;font-size:11px;font-weight:800;white-space:nowrap;text-shadow:0 1px 2px rgba(255,255,255,.95),0 0 3px rgba(255,255,255,.85);font-variant-numeric:tabular-nums;pointer-events:none}
+.bottom-card{position:absolute;bottom:0;left:0;right:0;z-index:1100;background:linear-gradient(180deg,rgba(8,16,24,.97),rgba(5,10,16,.99));border-top:1px solid var(--border);border-radius:18px 18px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.55);padding:6px 14px calc(12px + var(--safe-bottom));transform:translateY(100%);transition:transform .28s cubic-bezier(.2,.8,.2,1);display:none;backdrop-filter:blur(18px)}
+.bottom-card.show{display:block;transform:translateY(0)}
+.bc-grabber{width:36px;height:3px;background:rgba(148,163,184,.35);border-radius:2px;margin:2px auto 8px}
+.bc-main{display:flex;align-items:center;gap:12px}
+.bc-dot{width:14px;height:14px;border-radius:50%;background:#f97316;flex-shrink:0;box-shadow:0 0 0 3px rgba(249,115,22,.18)}
+.bc-dot.crit{background:#dc2626;box-shadow:0 0 0 3px rgba(220,38,38,.25);animation:bcDotPulse 1.2s ease-in-out infinite}
+.bc-dot.warn{background:#f97316}
+.bc-dot.safe{background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.2)}
+@keyframes bcDotPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
+.bc-text{font-size:15px;font-weight:800;line-height:1.15;color:var(--text);flex:1;min-width:0}
+.bc-text b{color:#fca5a5}
+.bc-eta{text-align:right;flex-shrink:0}
+.bc-eta-num{font-size:24px;font-weight:900;color:#f97316;line-height:1;font-variant-numeric:tabular-nums}
+.bc-eta-num.crit{color:#dc2626}
+.bc-eta-unit{font-size:9px;font-weight:700;color:#f97316;text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+.bc-eta-unit.crit{color:#dc2626}
+.bc-extra{display:flex;align-items:center;gap:10px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(148,163,184,.15);font-size:11px;font-weight:700;font-family:var(--font);flex-wrap:wrap}
+.bc-extra .kv{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;line-height:1.2;white-space:nowrap;font-variant-numeric:tabular-nums}
+.bc-extra .kv.alt{background:rgba(22,163,74,.15);color:#86efac;border:1px solid rgba(134,239,172,.35)}
+.bc-extra .kv.alt.empty{background:rgba(148,163,184,.1);color:#7a8f9e;border:1px solid rgba(148,163,184,.25)}
+.bc-extra .kv.spd{background:rgba(234,88,12,.15);color:#fdba74;border:1px solid rgba(253,186,116,.4)}
+.bc-extra .kv.spd.empty{background:rgba(148,163,184,.1);color:#7a8f9e;border:1px solid rgba(148,163,184,.25)}
+.bc-extra .ico{font-size:10px;opacity:.85}
+.bc-extra .kv.dist{background:rgba(59,130,246,.15);color:#93c5fd;border:1px solid rgba(147,197,253,.35)}
+.bc-extra .kv.dist.empty{background:rgba(148,163,184,.1);color:#7a8f9e;border:1px solid rgba(148,163,184,.25)}
+.bc-extra .kv.time{background:rgba(168,85,247,.15);color:#c4b5fd;border:1px solid rgba(196,181,253,.35)}
+.bc-extra .kv.time.empty{background:rgba(148,163,184,.1);color:#7a8f9e;border:1px solid rgba(148,163,184,.25)}
+.bc-info{display:flex;gap:12px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.12);font-size:11px;font-weight:700;color:var(--muted);font-family:var(--font);flex-wrap:wrap}
+.bc-info .bc-info-item{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.bc-info #bcInfoPlace{color:#86efac}
+.bc-info #bcInfoId{color:#fca5a5}
+@media (min-width:700px){
+  .top-alert{left:6px;right:auto;width:380px}
+  .strategic-panel{width:380px;right:auto}
+  .mass-banner{left:6px;right:auto;width:380px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="logo"><span class="logo-icon">🛰</span><span>KYIV OSINT RADAR</span></div>
+    <div class="header-right">
+      <div class="ballistic-timer" id="ballisticTimer"></div>
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Пошук місця..." autocomplete="off" spellcheck="false">
+        <button type="button" id="searchBtn">🔍</button>
+      </div>
+      <button type="button" class="lang-btn-header" id="btnLang">UA</button>
+      <div class="status"><span class="status-dot" id="statusDot"></span><span id="statusText">ЗАГРУЗКА…</span></div>
+    </div>
+  </div>
+  <div class="search-results" id="searchResults"></div>
+  <div id="map"></div>
+
+  <div class="top-alert" id="topAlert">
+    <button class="top-alert-close" id="topAlertClose">×</button>
+    <div class="top-alert-inner">
+      <div class="top-alert-icon" id="topAlertIcon">🚨</div>
+      <div class="top-alert-body">
+        <div class="top-alert-title" id="topAlertTitle">—</div>
+        <div class="top-alert-place" id="topAlertPlace" style="display:none">—</div>
+        <div class="top-alert-meta" id="topAlertMeta" style="display:none">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mass-banner" id="massBanner">
+    <button class="mass-banner-close" id="massBannerClose">×</button>
+    <div class="mass-banner-inner">
+      <div class="mass-banner-icon" id="massBannerIcon">🚀</div>
+      <div class="mass-banner-body">
+        <div class="mass-banner-title" id="massBannerTitle">МАСОВАНА ЗАГРОЗА</div>
+        <div class="mass-banner-line" id="massBannerLine1">—</div>
+        <div class="mass-banner-line" id="massBannerLine2" style="display:none">—</div>
+        <div class="mass-banner-line" id="massBannerLine3" style="display:none">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="strategic-panel" id="strategicPanel">
+    <div class="strategic-panel-title">
+      <span>✈️ СТРАТЕГІЧНА АКТИВНІСТЬ</span>
+      <button class="strategic-panel-close" id="strategicPanelClose">×</button>
+    </div>
+    <div id="strategicPanelBody"></div>
+  </div>
+
+  <div class="err-banner" id="errBanner">
+    <button class="err-close" onclick="this.parentNode.classList.remove('show')">×</button>
+    <b>Помилка:</b> <span id="errText">—</span>
+  </div>
+
+  <div class="hud-bottom">
+    <div class="btn-row">
+      <button type="button" id="btnRefresh" title="Оновити">↻</button>
+      <button type="button" id="btnQuickStatus" title="Статус">📊</button>
+      <button type="button" class="scope-btn on" id="btnScope">🌍</button>
+      <button type="button" class="geo-btn" id="btnGeo">🧭</button>
+      <button type="button" class="rings-btn off" id="btnRingsToggle">🎯</button>
+      <button type="button" class="settlements-btn" id="btnSettlements">🏘</button>
+      <button type="button" class="infra-btn" id="btnInfra">🏗</button>
+      <button type="button" class="power-btn" id="btnPower">⚡</button>
+      <button type="button" class="sound-btn on" id="soundToggle">🔔</button>
+      <button type="button" class="siren-btn" id="sirenBtn">🚨</button>
+      <button type="button" class="strategic-btn" id="btnStrategic">✈️</button>
+      <button type="button" class="mass-btn" id="btnMass">📡</button>
+      <button type="button" class="map-toggle" id="btnMapToggle">🛰</button>
+      <button type="button" class="marker-btn" id="btnMarkers">📍</button>
+      <button type="button" class="visual-btn on" id="btnVisual" title="Візуальні фічі">👁</button>
+      <button type="button" class="fs-btn" id="btnFullscreen">⛶</button>
+      <button type="button" id="btnClear" class="danger">✕</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<div class="bottom-card" id="bottomCard">
+  <div class="bc-grabber"></div>
+  <div class="bc-main">
+    <div class="bc-dot safe" id="bcDot"></div>
+    <div class="bc-text" id="bcText">Загроз не видно</div>
+    <div class="bc-eta">
+      <div class="bc-eta-num" id="bcEtaNum">—</div>
+      <div class="bc-eta-unit" id="bcEtaUnit">до міста</div>
+    </div>
+  </div>
+  <div class="bc-extra">
+    <span class="kv alt empty" id="bcAltChip"><span class="ico">▲</span><span id="bcAltVal">—</span></span>
+    <span class="kv spd empty" id="bcSpdChip"><span class="ico">⚡</span><span id="bcSpdVal">—</span></span>
+    <span class="kv dist empty" id="bcDistChip"><span class="ico">📏</span><span id="bcDistVal">—</span></span>
+    <span class="kv time empty" id="bcTimeChip"><span class="ico">🕐</span><span id="bcTimeVal">—</span></span>
+  </div>
+  <div class="bc-info" id="bcInfo">
+    <span class="bc-info-item" id="bcInfoPlace">📍 —</span>
+    <span class="bc-info-item" id="bcInfoId" style="display:none">🏷 #—</span>
+  </div>
+</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+"use strict";
+
+/* ============ 1. LOG ============ */
+const RadarLog = (() => {
+  const buf = []; const MAX = 200;
+  function push(scope, msg, err) {
+    buf.push({ t: Date.now(), scope, msg: String(msg) });
+    if (buf.length > MAX) buf.shift();
+    console.warn(`[radar:${scope}]`, msg, err || "");
+  }
+  function showBanner(m) {
+    try { const b = document.getElementById("errBanner"), t = document.getElementById("errText");
+      if (b && t) { t.textContent = String(m || "?"); b.classList.add("show"); } } catch (e) {}
+  }
+  return { push, showBanner };
+})();
+window.addEventListener("error", e => RadarLog.showBanner(e.message));
+
+/* ============ 2. UTILS ============ */
+const $ = id => document.getElementById(id);
+const esc = s => (s == null ? "" : String(s)).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const norm = s => (s || "").toLowerCase().replace(/[’`´']/g, "'").replace(/[^\p{L}\p{N}\s'-]/gu, " ").replace(/\s+/g, " ").trim();
+
+function haversineKm(a, b, c, d) {
+  if (![a, b, c, d].every(Number.isFinite)) return NaN;
+  const R = 6371, toR = x => x * Math.PI / 180;
+  const dLat = toR(c - a), dLon = toR(d - b);
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(toR(a)) * Math.cos(toR(c)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+function bearingBetween(lat1, lon1, lat2, lon2) {
+  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180, Δλ = (lon2 - lon1) * Math.PI / 180;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+function destPoint(lat, lon, brg, distKm) {
+  const R = 6371, br = brg * Math.PI / 180, lat1 = lat * Math.PI / 180, lon1 = lon * Math.PI / 180;
+  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(distKm / R) + Math.cos(lat1) * Math.sin(distKm / R) * Math.cos(br));
+  const lon2 = lon1 + Math.atan2(Math.sin(br) * Math.sin(distKm / R) * Math.cos(lat1), Math.cos(distKm / R) - Math.sin(lat1) * Math.sin(lat2));
+  return [lat2 * 180 / Math.PI, lon2 * 180 / Math.PI];
+}
+function kyivHoldPoint() { return destPoint(CONFIG.KYIV[0], CONFIG.KYIV[1], CONFIG.KYIV_HOLD_BEARING, CONFIG.KYIV_HOLD_KM); }
+function distToKyiv(lat, lon) { return haversineKm(lat, lon, CONFIG.KYIV[0], CONFIG.KYIV[1]); }
+function showToast(msg, ms = 1800) {
+  const t = $("toast"); if (!t) return;
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._tm); t._tm = setTimeout(() => t.classList.remove("show"), ms);
+}
+function formatEta(m) {
+  if (m == null) return "—";
+  if (m < 0.5) return "<1 хв";
+  if (m < 60) return `~${Math.round(m)} хв`;
+  return `~${Math.floor(m / 60)} год ${Math.round(m % 60)} хв`;
+}
+function formatAlt(alt) { if (alt == null) return ""; return alt >= 1000 ? (alt / 1000).toFixed(1).replace(/\.0$/, "") + " км" : alt + " м"; }
+function formatAltRange(alt) { if (!alt) return "—"; const f = m => m >= 1000 ? (m / 1000).toFixed(1) + " км" : m + " м"; return `${f(alt.min)} – ${f(alt.max)}`; }
+function compassName(deg) {
+  if (deg == null || !Number.isFinite(deg)) return "—";
+  const dirs = ["Пн","ПнСх","Сх","ПдСх","Пд","ПдЗх","Зх","ПнЗх"];
+  return dirs[Math.round(((deg % 360) + 360) % 360 / 45) % 8];
+}
+function levenshtein(a, b) {
+  a = (a||"").toLowerCase(); b = (b||"").toLowerCase();
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  const dp = Array.from({ length: m+1 }, () => new Array(n+1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
+    dp[i][j] = Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+  return dp[m][n];
+}
+
+/* ============ 3. CONFIG ============ */
+const CONFIG = {
+  API_THREATS: "https://neptun.in.ua/api/v1/threats",
+  API_ALERTS: "https://neptun.in.ua/api/v1/alerts",
+  API_MESSAGES: "https://neptun.in.ua/api/v1/messages",
+  WS_URL: "wss://neptun.in.ua/api/v1/stream",
+  POLL_MS: 5000,
+  KYIV: [50.45, 30.52],
+  ZONE_RADIUS_KM: 250,
+  KYIV_OBLAST_RADIUS_KM: 120,
+  KYIV_OBLAST_CENTER: [50.45, 30.52],
+  UKRAINE_CENTER: [48.5, 31.0], UKRAINE_ZOOM: 6,
+  STALE_MSG_MS: 20*60*1000, IMPACT_REPORT_TTL_MS: 30*60*1000,
+  EXTRAPOLATION_HOURS: 0.4, STALE_VISUAL_AFTER_HOURS: 0.5,
+  TRAIL_MIN_ORIGIN_DIST_KM: 30, UNCERTAIN_KM: 15,
+  TRAIL_MAX_AGE_MS: 3*60*60*1000, TRAIL_MAX_POINTS: 2000, TRAIL_MAX_GAP_KM: 35,
+  TRAIL_COLOR: "#dc2626", TRAIL_LINE_WIDTH: 2,
+  TRAIL_MIN_DIST_KM: 0.15, TRAIL_MIN_TIME_MS: 10*1000,
+  SIM_TRAIL_MIN_DIST_KM: 0.03,
+  SMOOTH_ALPHA: 0.4,
+  POPUP_OPTS: { maxWidth: 280, maxHeight: 300, autoPan: false, autoClose: true, closeOnClick: true, closeButton: true },
+  TOP_ALERT_TTL_MS: 30*1000, TOP_ALERT_BALLISTIC_TTL_MS: 60*1000,
+  DISMISS_TTL_MS: 30*60*1000,
+  CHAIN_TRANSITION_MS_PER_KM: 500, CHAIN_TRANSITION_MIN_MS: 800, CHAIN_TRANSITION_MAX_MS: 5000,
+  STRATEGIC_ACTIVITY_TTL_MS: 30*60*1000,
+  SOUND_ENABLED: true, SOUND_NEAR_KM: 25, SOUND_NEAR_KM_ROCKET: 35,
+  SOUND_NEAR_WINDOW_MS: 10000, SOUND_NEAR_WINDOW_MS_ROCKET: 5000, SOUND_COOLDOWN_MS: 4000,
+  APPROACH_OFFSET_KM: 40,
+  TILE_URL: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  TILE_URL_SAT: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  TILE_URL_SAT_REF: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+  TILE_ATTR: '&copy; OSM',
+  TILE_ATTR_SAT: "Tiles &copy; Esri",
+  BALLISTIC_COUNTDOWN_MS: 2*60*1000, BALLISTIC_MSG_MAX_AGE_MS: 5*60*1000,
+  KYIV_HOLD_BEARING: 135, KYIV_HOLD_KM: 1.35, KYIV_HOLD_MIN_KM: 1.2, KYIV_HOLD_MAX_KM: 1.5,
+  ALTITUDE_DROP_MIN_M: 200,
+  ALTITUDE_DROP_RATIO: 0.20,
+  ALTITUDE_DROP_COOLDOWN_MS: 12000
+};
+const SOUND_TYPE_FILTER = new Set(["uav","recon","geran5","missile","ballistic","banderol","jet_drone","kab","umpb","zircon","geran2","geran3","geran4"]);
+const ROCKET_TYPES = new Set(["missile","ballistic","banderol","jet_drone","kab","umpb","zircon"]);
+const OBSERVATION_TYPES = new Set(["banderol"]);
+
+/* ============ 4. SCOPE ============ */
+const Scope = (() => {
+  let mode = "kyiv";
+  try { const v = localStorage.getItem("kyiv_scope_mode_v1"); if (v === "kyiv" || v === "ukraine") mode = v; } catch (e) {}
+  function get() { return mode; }
+  function set(m) { mode = (m === "ukraine") ? "ukraine" : "kyiv"; try { localStorage.setItem("kyiv_scope_mode_v1", mode); } catch (e) {} }
+  function isUkraine() { return mode === "ukraine"; }
+  return { get, set, isUkraine };
+})();
+function inZone(lat, lon) {
+  if (lat == null || lon == null) return false;
+  if (Scope.isUkraine()) return lat >= 44 && lat <= 52.5 && lon >= 21.5 && lon <= 41;
+  return haversineKm(CONFIG.KYIV[0], CONFIG.KYIV[1], lat, lon) <= CONFIG.ZONE_RADIUS_KM;
+}
+function inKyivOblast(lat, lon) {
+  if (lat == null || lon == null) return false;
+  if (lat < 49.15 || lat > 51.65 || lon < 29.25 || lon > 32.35) return false;
+  return haversineKm(CONFIG.KYIV_OBLAST_CENTER[0], CONFIG.KYIV_OBLAST_CENTER[1], lat, lon) <= 140;
+}
+
+/* ============ 5. CHANNELS ============ */
+const PRIORITY_1 = new Set(["chyste_nebo","kyiv_monitor1","kyiv_airdef"]);
+const PRIORITY_2 = new Set(["ukrainemonitorzagroz","ukraine_ua_24_7","ukraineradar_24_7","ukraineradar","kpszsu"]);
+const PRIORITY_CHANNELS = new Set([...PRIORITY_1, ...PRIORITY_2]);
+function normalizeChannel(ch) {
+  if (!ch) return "unknown";
+  let k = String(ch).trim().replace(/^@/, "");
+  k = k.replace(/^https?:\/\/(?:t\.me|telegram\.me)\//i, "").replace(/\/+$/, "");
+  return k.toLowerCase().replace(/\s+/g, "_") || "unknown";
+}
+function isPriorityChannel(ch) {
+  const k = normalizeChannel(ch);
+  if (PRIORITY_CHANNELS.has(k)) return true;
+  for (const p of PRIORITY_CHANNELS) if (k.includes(p)) return true;
+  return false;
+}
+function priorityLevel(ch) {
+  const k = normalizeChannel(ch);
+  if (PRIORITY_1.has(k)) return 1;
+  if (PRIORITY_2.has(k)) return 2;
+  for (const p of PRIORITY_1) if (k.includes(p)) return 1;
+  for (const p of PRIORITY_2) if (k.includes(p)) return 2;
+  return 0;
+}
+function channelWeight(name) {
+  const lvl = priorityLevel(name);
+  if (lvl === 1) return 3.0;
+  if (lvl === 2) return 2.5;
+  return 1.0;
+}
+function channelClass(name) {
+  const lvl = priorityLevel(name);
+  if (lvl === 1) return "prio";
+  if (lvl === 2) return "prio-l2";
+  return "";
+}
+function uniqueChannels(arr) {
+  const out = new Set();
+  if (!arr) return out;
+  for (const ch of arr) out.add(normalizeChannel(ch));
+  return out;
+}
+function totalWeightOf(set) {
+  let w = 0;
+  for (const ch of uniqueChannels(set)) w += channelWeight(ch);
+  return w;
+}
+function hasPrioritySource(channels) {
+  for (const ch of uniqueChannels(channels)) if (isPriorityChannel(ch)) return true;
+  return false;
+}
+function confirmStats(channels) {
+  const uniq = uniqueChannels(channels);
+  return { confirmN: uniq.size, totalW: totalWeightOf(uniq), hasPrio: hasPrioritySource(uniq), channels: uniq };
+}
+function channelsListHtml(setOrArr) {
+  const uniq = uniqueChannels(setOrArr);
+  if (!uniq.size) return "";
+  const chips = [...uniq].map(ch => `<span class="ch ${channelClass(ch)}">${esc(ch)}</span>`).join("");
+  return `<div class="popup-channels"><b>Джерела (${uniq.size}):</b><br>${chips}</div>`;
+}
+
+/* ============ 6. GEO DATA ============ */
+const KYIV_BRIDGES = [
+{id:"b1",name:"Автовокзальний шляхопровід",type:"overpass",district:"Голосіївський",bank:"right",lat:50.421,lng:30.521},
+{id:"b9",name:"Гаванський міст",type:"bridge",district:"Подільський",bank:"right",lat:50.468,lng:30.516},
+{id:"b11",name:"Дарницький міст",type:"bridge",district:"Дніпровський",bank:"left",lat:50.421,lng:30.604},
+{id:"b21",name:"Міст Метро",type:"metro",district:"Дніпровський",bank:"both",lat:50.449,lng:30.573},
+{id:"b22",name:"Міст Патона",type:"bridge",district:"Печерський",bank:"both",lat:50.421,lng:30.587},
+{id:"b36",name:"Подільський мостовий перехід",type:"bridge",district:"Подільський",bank:"both",lat:50.475,lng:30.544},
+{id:"b48",name:"Північний міст",type:"bridge",district:"Оболонський",bank:"both",lat:50.493,lng:30.527},
+{id:"b54",name:"Південний міст",type:"bridge",district:"Дарницький",bank:"both",lat:50.396,lng:30.582}
+];
+const KYIV_SUBSTATIONS = [
+["ПС 750 кВ «Київська»",50.490836,29.688768,"750","Макарівський р-н"],
+["ПС 330 кВ «Північна»",50.61313,30.38222,"330","Нові Петрівці"],
+["ПС 330 кВ «Новокиївська»",50.380,30.470,"330","Хотів"],
+["ПС 330 кВ «Нивки»",50.476,30.410,"330","Шевченківський"],
+["ПС 330 кВ «Броварська»",50.538,30.899,"330","Красилівка"],
+["ПС 110 кВ «Пріорська»",50.509,30.424,"110","Виноградар"],
+["ПС 110 кВ «Біличі»",50.472,30.330,"110","Біличі"],
+["ПС 110 кВ «Берковецька»",50.495,30.359,"110","Берковець"],
+["ПС 110 кВ «Московська»",50.430,30.520,"110","Голосіївський"],
+["ПС 110 кВ «Олімпійська»",50.433,30.520,"110","Печерський"],
+["ПС 110 кВ «Осокорки»",50.395,30.620,"110","Осокорки"],
+["ПС 110 кВ «Поливка»",50.400,30.630,"110","Позняки"],
+["ПС 110 кВ «Соломенська»",50.430,30.480,"110","Солом'янський"],
+["ПС 110 кВ «Протаївська»",50.425,30.500,"110","Солом'янський"]
+];
+const ENERGY_DB = [
+{id:"e1",name:"Київська ТЕЦ-5",type:"power_plant",category:"CHP",lat:50.393,lng:30.569},
+{id:"e2",name:"Київська ТЕЦ-6",type:"power_plant",category:"CHP",lat:50.532,lng:30.662},
+{id:"e3",name:"Дарницька ТЕЦ",type:"power_plant",category:"CHP",lat:50.447,lng:30.640},
+{id:"e6",name:"Трипільська ТЕС",type:"power_plant",category:"thermal",lat:50.163,lng:30.746},
+{id:"e11",name:"Київська ГЕС",type:"hydro",category:"HPP",lat:50.584,lng:30.488},
+{id:"e12",name:"Київська ГАЕС",type:"hydro",category:"PSP",lat:50.585,lng:30.490}
+];
+const KYIV_OBLAST_SETTLEMENTS = (() => {
+  const raw = [
+    ["Прип'ять",51.39474302,30.08446583,"Чорнобильська зона","c"],["Чорнобиль",51.27184786,30.22441931,"Чорнобильська зона","c"],
+    ["Біла Церква",49.80563193,30.10926837,"Білоцерківський","c"],["Сквира",49.73079435,29.66402976,"Білоцерківський","c"],
+    ["Тараща",49.56066626,30.49540089,"Білоцерківський","c"],["Тетіїв",49.37317715,29.67843897,"Білоцерківський","c"],
+    ["Узин",49.82016789,30.42185138,"Білоцерківський","c"],["Бориспіль",50.3612042,30.95256256,"Бориспільський","c"],
+    ["Переяслав",50.07228667,31.45321568,"Бориспільський","c"],["Яготин",50.24025082,31.79157062,"Бориспільський","c"],
+    ["Баришівка",50.35755065,31.31698645,"Броварський","s"],["Березань",50.31236212,31.47751805,"Броварський","c"],
+    ["Бровари",50.50655438,30.80095343,"Броварський","c"],["Буча",50.55148938,30.21142382,"Бучанський","c"],
+    ["Вишневе",50.38625104,30.36581354,"Бучанський","c"],["Ірпінь",50.51146447,30.23870831,"Бучанський","c"],
+    ["Гостомель",50.57875256,30.26001532,"Бучанський","s"],["Вишгород",50.58786993,30.5017729,"Вишгородський","c"],
+    ["Славутич",51.52103146,30.75931254,"Вишгородський","c"],["Богуслав",49.5464611,30.8713407,"Обухівський","c"],
+    ["Васильків",50.18442314,30.31563006,"Обухівський","c"],["Кагарлик",49.8642776,30.81538338,"Обухівський","c"],
+    ["Миронівка",49.66192468,30.98131947,"Обухівський","c"],["Обухів",50.11393672,30.62464616,"Обухівський","c"],
+    ["Ржищів",49.97019938,31.04991003,"Обухівський","c"],["Українка",50.1387578,30.73689237,"Обухівський","c"],
+    ["Боярка",50.33615993,30.28336111,"Фастівський","c"],["Фастів",50.07670738,29.92340123,"Фастівський","c"],
+    ["Київ",50.4501,30.5234,"Київ","c"],
+    ["Суми",50.9077,34.7981,"Сумська","c"],["Харків",49.98967,36.208309,"Харківська","c"],
+    ["Чернігів",51.500,31.290,"Чернігівська","c"],["Ніжин",51.050,31.880,"Чернігівська","s"],
+    ["Конотоп",51.237469,33.21217,"Сумська","c"],["Шостка",51.86282,33.487831,"Сумська","c"],
+    ["Курск",51.73,36.19,"Курська","c"],["Брянск",53.25,34.37,"Брянська","c"],
+    ["Белгород",50.60,36.59,"Бєлгородська","c"],["Воронеж",51.67,39.18,"Воронезька","c"],
+    ["Ростов-на-Дону",47.24,39.70,"Ростовська","c"],["Орел",52.97,36.06,"Орловська","c"],
+    ["Осещина",50.6480,30.4870,"Вишгородський","s"],["Кулибаба",50.131547,30.298383,"Обухівський","s"],
+    ["Семиполки",50.719197,30.9371205,"Броварський","s"],["Кіпті",51.0551275,31.1529545,"Чернігівський","s"],
+    ["Козелець",50.91300,31.11700,"Чернігівський","s"],["Димер",50.7900,30.3200,"Вишгородський","s"],
+    ["Згурівка",50.4628,31.7744,"Броварський","s"]
+  ];
+  const seen = new Map();
+  for (const r of raw) { const key = r[0] + "|" + r[3]; if (!seen.has(key)) seen.set(key, r); }
+  return [...seen.values()];
+})();
+
+function findSettlementInText(text) {
+  if (!text) return null;
+  const low = norm(text);
+  if (!low) return null;
+  let best = null;
+  for (const s of KYIV_OBLAST_SETTLEMENTS) {
+    const n = norm(s[0]);
+    if (n.length < 3) continue;
+    const idx = low.indexOf(n);
+    if (idx < 0) continue;
+    const before = idx > 0 ? low[idx - 1] : " ", after = idx + n.length < low.length ? low[idx + n.length] : " ";
+    if (!(/[^а-яіїєґa-z0-9]/i.test(before) || before === " ")) continue;
+    if (!(/[^а-яіїєґa-z0-9]/i.test(after) || after === " ")) continue;
+    const score = n.length * 10 + (s[4] === "c" ? 2 : 1);
+    if (!best || score > best.score) best = { key: "s:" + n, name: s[0], lat: s[1], lon: s[2], index: idx, length: n.length, score };
+  }
+  return best;
+}
+function findPlaceInText(text) { return findSettlementInText(text); }
+function findPlaceFuzzy(text, th = 0.7) {
+  const exact = findPlaceInText(text);
+  if (exact) return exact;
+  const low = norm(text);
+  let best = null, bestS = 0;
+  for (const s of KYIV_OBLAST_SETTLEMENTS) {
+    const n = norm(s[0]);
+    if (n.length < 3) continue;
+    if (low.includes(n)) return { key: "s:" + n, name: s[0], lat: s[1], lon: s[2] };
+    const d = levenshtein(low.slice(0, n.length + 3), n);
+    const sc = 1 - d / Math.max(low.length, n.length);
+    if (sc >= th && sc > bestS) { bestS = sc; best = s; }
+  }
+  return best ? { key: "s:" + best[0], name: best[0], lat: best[1], lon: best[2] } : null;
+}
+function isKyivOrOblast(name) {
+  if (!name) return false;
+  const s = String(name).toLowerCase();
+  if (/київ(?!ськ)/.test(s) || /киев(?!ск)/.test(s)) return true;
+  return /київськ|киевск/.test(s);
+}
+
+/* ============ 7. TYPES ============ */
+const TYPE_META = {
+  uav:{color:"#FFD700",label:"БПЛА"},recon:{color:"#3b82f6",label:"Розв"},
+  geran2:{color:"#dc2626",label:"Герань-2"},geran3:{color:"#dc2626",label:"Герань-3"},
+  geran4:{color:"#dc2626",label:"Герань-4"},geran5:{color:"#dc2626",label:"Герань-5"},
+  jet_drone:{color:"#dc2626",label:"Реакт. БПЛА"},
+  fpv:{color:"#a3e635",label:"FPV"},
+  missile:{color:"#dc2626",label:"КР"},ballistic:{color:"#dc2626",label:"Бал"},
+  banderol:{color:"#dc2626",label:"S8000"},kab:{color:"#dc2626",label:"КАБ"},
+  umpb:{color:"#dc2626",label:"УМПБ-5"},mig31k:{color:"#e11d48",label:"МиГ-31К"},
+  strategic_aviation:{color:"#ea580c",label:"Стратег"},
+  zircon:{color:"#dc2626",label:"Циркон"},
+  unknown:{color:"#475569",label:"?"}
+};
+const getMeta = ty => TYPE_META[ty] || TYPE_META.unknown;
+
+function simpleGlyph(type) {
+  const t = type || "unknown";
+  if (["ballistic","zircon","missile","banderol","kab","umpb"].includes(t)) return { shape:"missile", c:"#dc2626", big:true };
+  if (t === "fpv") return { shape:"arrow", c:"#a3e635" };
+  if (t === "recon") return { shape:"arrow", c:"#3b82f6" };
+  if (["mig31k","strategic_aviation","awacs"].includes(t)) return { shape:"plane", c:"#FFD700" };
+  return { shape:"arrow", c:"#FFD700" };
+}
+function rocketSvg(c) { return `<svg viewBox="0 0 24 40"><path d="M12 1 C14 1 16 6 16 12 L16 26 L19 32 L16 30 L16 34 L12 38 L8 34 L8 30 L5 32 L8 26 L8 12 C8 6 10 1 12 1 Z" fill="${c}" /></svg>`; }
+function glyphHtml(shape, color, big) {
+  const c = color || "#dc2626";
+  if (shape === "missile") {
+    const h = big ? 24 : 20, w = Math.round(h * 24 / 40);
+    return `<div style="width:${w}px;height:${h}px;line-height:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,.55))">${rocketSvg(c).replace("<svg ", `<svg width="${w}" height="${h}" `)}</div>`;
+  }
+  if (shape === "arrow") {
+    const isUav = (c === "#FFD700");
+    const bg = isUav ? "#FFD500" : c;
+    return `<div style="width:22px;height:22px;border-radius:50%;background:${bg};border:2.5px solid #000;box-shadow:0 0 0 1.5px #fff inset,0 2px 5px rgba(0,0,0,.7),0 0 10px rgba(255,213,0,.9);display:flex;align-items:center;justify-content:center;"><svg width="12" height="12" viewBox="0 0 16 16"><path fill="#000" stroke="#fff" stroke-width="0.8" d="M8 1.2 L14.2 13.8 L8 11.2 L1.8 13.8 Z"/></svg></div>`;
+  }
+  if (shape === "plane") return `<span style="color:${c};font-size:15px;filter:drop-shadow(0 0 2px #000)">✈</span>`;
+  return `<svg width="15" height="15" viewBox="0 0 16 16"><path fill="${c}" d="M8 1.2 L14.2 13.8 L8 11.2 L1.8 13.8 Z"/></svg>`;
+}
+const _iconCache = new Map();
+function iconCacheKey(cls, h, cn, tw, st, un, ai, stg, inS, hp, sim, sp) {
+  const t = (cls && cls.type) || "?";
+  return [t, h == null ? "na" : Math.round(h/5)*5, cn|0, Math.round((tw||0)*10), st?1:0, un?1:0, ai||"-", stg||"-", inS?1:0, hp?1:0, sim?1:0, sp?Math.round(sp/10)*10:0,
+    cls._trackId||"", cls._altitude||0, cls._speedReal?1:0, cls._altDropping?1:0,
+    cls._labelTime||0, cls._etaMin != null ? Math.round(cls._etaMin) : -1,
+    (typeof activeMarkerKey !== "undefined" && activeMarkerKey === cls._chainKey) ? 1 : 0].join("|");
+}
+function buildInfoLabel(cls, speedKmh, etaMin, timeMs) {
+  const meta = getMeta(cls.type);
+  const title = (cls._exactName || meta.label || "?").toUpperCase();
+  const id = cls._trackId;
+  const parts1 = [];
+  if (cls._speedReal && speedKmh != null && speedKmh > 30) parts1.push(`<span class="il-spd">${Math.round(speedKmh)}</span>`);
+  else if (speedKmh != null && speedKmh > 30) parts1.push(`<span class="il-spd-table">~${Math.round(speedKmh)}</span>`);
+  if (cls._altitude != null) {
+    if (cls._altDropping) parts1.push(`<span class="il-alt-drop">▼${formatAlt(cls._altitude)}</span>`);
+    else parts1.push(`<span class="il-alt">▲${formatAlt(cls._altitude)}</span>`);
+  }
+  const parts2 = [];
+  if (timeMs) parts2.push(`<span class="il-time">${new Date(timeMs).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span>`);
+  if (etaMin != null) parts2.push(`<span class="il-eta">~${Math.round(etaMin)} хв</span>`);
+  let html = `<div class="tw-info-label"><div class="il-title">${esc(title)}${id ? " #" + id : ""}</div>`;
+  if (parts1.length) html += `<div class="il-row">${parts1.join('<span class="sep">·</span>')}</div>`;
+  if (parts2.length) html += `<div class="il-row">${parts2.join('<span class="sep">·</span>')}</div>`;
+  return html + `</div>`;
+}
+function makeIcon(cls, heading, confirmN, totalWeight, stale, uncertain, aiLevel, stage, inSiren, hasPriority, isSimulated, speedKmh) {
+  const key = iconCacheKey(cls, heading, confirmN, totalWeight, stale, uncertain, aiLevel, stage, inSiren, hasPriority, isSimulated, speedKmh);
+  const cached = _iconCache.get(key);
+  if (cached) return cached;
+  const meta = simpleGlyph(cls.type);
+  const rot = heading != null ? heading : 0;
+  const isBal = !!meta.big;
+  const glyphPx = isBal ? 28 : 18;
+  const boxSize = glyphPx + 16;
+  const classes = ["threat-icon"];
+  if (cls._stopped) classes.push("falling");
+  if ((cls.type === "ballistic" || cls.type === "zircon") && stage === "threat") classes.push("ballistic-alarm");
+  if (hasPriority) classes.push("priority-star");
+  const countHtml = cls._count ? `<div class="count-badge">${cls._count}</div>` : "";
+  const confirmHtml = confirmN >= 1 ? `<div class="confirm-badge ${confirmN >= 3 ? "low" : ""}">${confirmN}</div>` : "";
+  const glyph = glyphHtml(meta.shape, meta.c, meta.big);
+  const isActive = (typeof activeMarkerType !== "undefined") && activeMarkerKey && cls._chainKey && activeMarkerKey === cls._chainKey;
+  const showLabel = isActive || VIS_FLAGS.labelsAll;
+  const infoLabel = showLabel ? buildInfoLabel(cls, speedKmh, cls._etaMin, cls._labelTime) : "";
+  const idMini = (!showLabel && cls._trackId) ? `<div class="tw-id-badge-mini">#${cls._trackId}</div>` : "";
+  const icon = L.divIcon({
+    className: "",
+    html: `<div class="threat-wrap" style="width:${boxSize}px;height:${boxSize}px;">
+      <div class="threat-rotate" style="transform:rotate(${rot}deg);"><div class="${classes.join(" ")}">${glyph}</div></div>
+      ${confirmHtml}${countHtml}${infoLabel}${idMini}
+    </div>`,
+    iconSize: [boxSize, boxSize], iconAnchor: [boxSize / 2, boxSize / 2], popupAnchor: [0, -boxSize / 2]
+  });
+  if (_iconCache.size > 500) _iconCache.clear();
+  _iconCache.set(key, icon);
+  return icon;
+}
+function impactBigIcon(kind) {
+  const map = { down:"🛬", shot:"🛡", fire:"🔥", unknown:"❓", hit:"💥" };
+  const emoji = map[kind] || "💥";
+  return L.divIcon({ className: "", html: `<div class="impact-simple" style="font-size:20px;filter:drop-shadow(0 0 3px rgba(0,0,0,.6))">${emoji}</div>`, iconSize:[24,24], iconAnchor:[12,12] });
+}
+function makeStrategicIcon(typeMeta, count, isTraining, etaMin) {
+  const cls = ["strat-icon", isTraining ? "training" : "active"];
+  const countHtml = count > 1 ? `<div class="strat-badge">${count}</div>` : "";
+  return L.divIcon({ className: "", html: `<div class="strat-wrap"><div class="${cls.join(" ")}"><span style="font-size:16px">✈</span></div>${countHtml}</div>`, iconSize:[28,28], iconAnchor:[14,14] });
+}
+
+/* ============ 8. CLASSIFIER ============ */
+const CLASSIFIER = (() => {
+  const RULES = [
+    {re:/циркон|zircon|3м22|3m22/i,type:"zircon",label:"Циркон",hard:true,isZircon:true},
+    {re:/кінжал|кинжал/i,type:"ballistic",label:"Кинжал",hard:true},
+    {re:/іскандер|искандер/i,type:"ballistic",label:"Іскандер",hard:true},
+    {re:/балістік|баллистик/i,type:"ballistic",label:"Бал",hard:true},
+    {re:/реактивн[а-яіїєґ]*\s*(шахед|геран|бпла|дрон)|jet\s*drone/i,type:"jet_drone",label:"Реакт. БПЛА",hard:true},
+    {re:/герань\s*-?\s*5|geran\s*-?\s*5/i,type:"geran5",label:"Герань-5",hard:true,isGeran5:true},
+    {re:/герань\s*-?\s*4|geran\s*-?\s*4/i,type:"geran4",label:"Герань-4",hard:true},
+    {re:/герань\s*-?\s*3|geran\s*-?\s*3/i,type:"geran3",label:"Герань-3",hard:true},
+    {re:/герань\s*-?\s*2|geran\s*-?\s*2/i,type:"geran2",label:"Герань-2",hard:true},
+    {re:/каб\b|kab\b/i,type:"kab",label:"КАБ",hard:true},
+    {re:/крилат[аиі]?\s+ракет|х-?\s*101|калібр|калибр/i,type:"missile",label:"КР",hard:true},
+    {re:/миг-?31|міг-?31/i,type:"mig31k",label:"МиГ-31К",hard:true},
+    {re:/fpv|фпв/i,type:"fpv",label:"FPV"},
+    {re:/розвідник|разведчик|recon/i,type:"recon",label:"Розв"},
+    {re:/шахед|shahed|герань|geran|гербера|бпла|дрон|безпілотник/i,type:"uav",label:"БПЛА"}
+  ];
+  return function(text) {
+    text = text || "";
+    for (const r of RULES) if (r.re.test(text)) return { ...r, confidence: 0.85 };
+    return null;
+  };
+})();
+function detectExactName(text) {
+  if (!text) return null;
+  const tt = text.toLowerCase();
+  let m = tt.match(/герань\s*-?\s*([2-5])\b/); if (m) return `Герань-${m[1]}`;
+  m = tt.match(/(?:шахед|shahed)\s*-?\s*(\d{2,3})\b/); if (m) return `Шахед-${m[1]}`;
+  if (/реактивн/.test(tt) && /(шахед|геран|бпла|дрон)/.test(tt)) return "Реакт. БПЛА";
+  if (/іскандер|искандер/i.test(tt)) return "Іскандер";
+  if (/кинжал|кінжал/.test(tt)) return "Кинжал";
+  if (/циркон|zircon/.test(tt)) return "Циркон";
+  return null;
+}
+const KINEMATICS = {
+  uav:{speedCruise:170,altMin:50,altMax:500},
+  recon:{speedCruise:130,altMin:200,altMax:1500},
+  fpv:{speedCruise:90,altMin:10,altMax:120},
+  geran2:{speedCruise:175,altMin:50,altMax:250},
+  geran3:{speedCruise:185,altMin:50,altMax:280},
+  geran4:{speedCruise:195,altMin:50,altMax:300},
+  geran5:{speedCruise:210,altMin:50,altMax:350},
+  jet_drone:{speedCruise:750,altMin:100,altMax:800},
+  missile:{speedCruise:880,altMin:50,altMax:600},
+  ballistic:{speedCruise:2200,altMin:5000,altMax:50000},
+  zircon:{speedCruise:2800,altMin:1000,altMax:40000},
+  unknown:{speedCruise:160,altMin:50,altMax:500}
+};
+function kinematicsFor(type) { return KINEMATICS[type] || KINEMATICS.unknown; }
+function resolveSpeedKmh(type, txt) {
+  const k = kinematicsFor(type);
+  if (type === "geran5") return 210;
+  if (type === "geran4") return 195;
+  if (type === "geran3") return 185;
+  if (type === "geran2") return 175;
+  if (type === "jet_drone") return 750;
+  if (type === "zircon") return 2800;
+  return k.speedCruise;
+}
+function observedSpeedFromPoints(points, windowMin) {
+  if (!points || points.length < 2) return null;
+  const winMs = (windowMin || 15) * 60 * 1000;
+  const pts = points
+    .filter(p => p && p.lat != null && (p.lng != null || p.lon != null) && (p.ts || p.t))
+    .map(p => ({ lat: p.lat, lon: p.lng != null ? p.lng : p.lon, ts: p.ts || p.t }))
+    .sort((a, b) => a.ts - b.ts);
+  if (pts.length < 2) return null;
+  const now = pts[pts.length - 1].ts;
+  const recent = pts.filter(p => now - p.ts <= winMs);
+  if (recent.length < 2) return null;
+  let totalKm = 0, totalH = 0, pairs = 0;
+  for (let i = 1; i < recent.length; i++) {
+    const a = recent[i-1], b = recent[i];
+    const dtH = (b.ts - a.ts) / 3600000;
+    if (dtH <= 0.001 || dtH > 1) continue;
+    const d = haversineKm(a.lat, a.lon, b.lat, b.lon);
+    if (d > 100) continue;
+    if (d / dtH > 1500) continue;
+    totalKm += d; totalH += dtH; pairs++;
+  }
+  if (pairs === 0 || totalH <= 0) return null;
+  return Math.round(totalKm / totalH);
+}
+function etaToKyivMin(lat, lon, type, spd) {
+  if (lat == null || lon == null) return null;
+  const s = spd || resolveSpeedKmh(type, "");
+  return s ? haversineKm(lat, lon, CONFIG.KYIV[0], CONFIG.KYIV[1]) / s * 60 : null;
+}
+
+function parseAltitude(t) {
+  if (typeof t.altitude === "number") return Math.round(t.altitude);
+  const text = [t.title, t.explanationShort, typeof t === "string" ? t : ""].filter(Boolean).join(" ");
+  if (!text) return null;
+  let m = text.match(/(?:висот[аиою]|высот[аеыою])\s*[:=]?\s*(\d+(?:[.,]\d+)?)\s*(км|km|м|m)?\b/i);
+  if (m) {
+    const v = parseFloat(m[1].replace(",", "."));
+    const unit = (m[2] || "").toLowerCase();
+    let meters;
+    if (unit === "км" || unit === "km") meters = v * 1000;
+    else if (unit === "м" || unit === "m") meters = v;
+    else meters = v <= 20 ? v * 1000 : v;
+    if (meters >= 50 && meters <= 20000) return Math.round(meters);
+  }
+  m = text.match(/(\d+(?:[.,]\d+)?)\s*(км|km|м|m)\b/i);
+  if (m) {
+    const v = parseFloat(m[1].replace(",", "."));
+    const unit = m[2].toLowerCase();
+    const meters = (unit === "км" || unit === "km") ? v * 1000 : v;
+    if (meters >= 50 && meters <= 20000) return Math.round(meters);
+  }
+  return null;
+}
+function isFallingMessage(text) { return /падає|падають|падінн|зниженн|втрачає висоту|збит|сбит|упал|упав|впав|на\s+землю|збито|уламк|обломк|фрагмент|осколк/i.test(text || ""); }
+function parseCoordsFromText(text) {
+  if (!text) return null;
+  const m = text.match(/(-?\d{2}\.\d{3,8})\s*[,\s]\s*(-?\d{2,3}\.\d{3,8})/);
+  if (!m) return null;
+  const lat = parseFloat(m[1]), lon = parseFloat(m[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return [lat, lon];
+}
+function parsePlaceAndAltitude(text) {
+  if (!text) return null;
+  let raw = String(text).trim();
+  if (!raw || raw.length > 80) return null;
+  raw = raw.replace(/^[•·\-–—\s]+/, "").replace(/[\s]+$/, "");
+  let m = raw.match(/^([А-ЯІЇЄҐа-яіїєґ'’\-][А-ЯІЇЄҐа-яіїєґ'’\-\s]{1,30}?)\s*(?:,?\s*(?:висот[аиою]|высот[аеыою])\s*)?(\d+(?:[.,]\d+)?)\s*(км|km|м|m)?\s*$/i);
+  if (!m) return null;
+  const placeName = m[1].trim();
+  const numVal = parseFloat(m[2].replace(",", "."));
+  const unit = (m[3] || "").toLowerCase();
+  let alt = null;
+  if (unit === "км" || unit === "km") alt = numVal * 1000;
+  else if (unit === "м" || unit === "m") alt = numVal;
+  else alt = numVal <= 20 ? numVal * 1000 : numVal;
+  if (!(alt >= 50 && alt <= 20000)) return null;
+  const place = findPlaceInText(placeName);
+  return place ? { place, altitude: alt } : null;
+}
+function isJustAltitude(text) {
+  if (!text) return null;
+  const raw = String(text).trim();
+  if (raw.length > 12) return null;
+  const m = raw.match(/^(?:висот[аиою]|высот[аеыою])?\s*[:=]?\s*(\d{3,5})\s*(?:м|m)?\s*$/i);
+  if (!m) return null;
+  const v = parseInt(m[1], 10);
+  return (v >= 500 && v <= 15000) ? v : null;
+}
+
+/* ============ 9. TRAILS ============ */
+const UAV_ACC = { GRID_KM: 5, TIME_WINDOW_MS: 12*60*1000, MERGE_RADIUS_KM: 8, MAX_GAP_KM: 40 };
+function typeBucket(type) {
+  if (["geran2","geran3","geran4","geran5","uav"].includes(type)) return "shahed";
+  if (type === "jet_drone") return "jet";
+  if (type === "fpv") return "fpv";
+  if (type === "recon") return "recon";
+  if (["missile","banderol","kab","umpb"].includes(type)) return "cruise";
+  if (["ballistic","zircon"].includes(type)) return "ballistic";
+  return type;
+}
+function geoGridKey(lat, lon, g) {
+  if (lat == null || lon == null) return "nogrid";
+  return Math.round(lat / (g/111)) + ":" + Math.round(lon / (g/71));
+}
+function timeBucket(ms, w) { return Math.floor((ms||Date.now()) / (w||UAV_ACC.TIME_WINDOW_MS)); }
+function resolveTrailKey(cls, place, text, msgMs, explicitId) {
+  const bucket = typeBucket(cls.type);
+  const lat = place && place.lat, lon = place && place.lon;
+  if (lat != null && lon != null) {
+    let best = null, bestDist = Infinity;
+    for (const [k, chain] of State.trails) {
+      if (!chain || !chain.cls) continue;
+      if (typeBucket(chain.cls.type) !== bucket) continue;
+      if (msgMs - chain.lastSeen > UAV_ACC.TIME_WINDOW_MS * 1.5) continue;
+      const last = chain.points[chain.points.length - 1];
+      if (!last) continue;
+      const d = haversineKm(last.lat, last.lon, lat, lon);
+      if (d <= UAV_ACC.MERGE_RADIUS_KM && d < bestDist) { bestDist = d; best = k; }
+    }
+    if (best) return { key: best };
+  }
+  const grid = geoGridKey(lat, lon, UAV_ACC.GRID_KM);
+  const tb = timeBucket(msgMs);
+  const placeKey = place && place.key ? place.key : grid;
+  return { key: bucket + "|" + placeKey + "|" + tb };
+}
+function appendTrailPoint(chainKey, cls, point, ch, msgMs, parsedTargetData) {
+  let chain = State.trails.get(chainKey);
+  if (!chain) {
+    const sample = point.sampleText || "";
+    chain = {
+      cls, points: [], firstSeen: msgMs, lastSeen: msgMs, channels: new Set(),
+      markerRef: null, polyline: null, _key: chainKey,
+      _trackId: TrackIds.assign(), _labelTime: msgMs, _etaMin: null,
+      _falling: false, _altDropping: false, altitude: null, sampleText: sample,
+      exactName: point.exactName || detectExactName(sample),
+      speedLive: null, _speedReal: false, _stopped: false,
+      route: parsedTargetData?.route || null
+    };
+    State.trails.set(chainKey, chain);
+  }
+  const last = chain.points[chain.points.length - 1];
+  if (!last || haversineKm(last.lat, last.lon, point.lat, point.lon) > 0.15 || (msgMs - (last.t||0)) > 60_000) {
+    chain.points.push({ lat: point.lat, lon: point.lon, name: point.name, t: msgMs, ts: msgMs, channel: ch });
+    if (chain.points.length > CONFIG.TRAIL_MAX_POINTS) chain.points.shift();
+    try {
+      const trailForKin = chain.points.map(p => ({ lat: p.lat, lng: p.lon, ts: p.t }));
+      const newLive = observedSpeedFromPoints(trailForKin, 10);
+      if (newLive != null) { chain.speedLive = newLive; chain._speedReal = true; }
+    } catch (e) {}
+  }
+  chain.channels.add(normalizeChannel(ch));
+  chain.lastSeen = msgMs;
+  chain._labelTime = msgMs;
+  if (point.exactName && !chain.exactName) chain.exactName = point.exactName;
+  if (point._falling) chain._falling = true;
+  if (chain.polyline) try { chain.polyline.setLatLngs(chain.points.map(p => [p.lat, p.lon])); } catch (e) {}
+  return { chain };
+}
+function updateChainAltitude(chain, newAlt, msgMs) {
+  if (newAlt == null || !chain) return;
+  const prevAlt = chain.altitude;
+  if (prevAlt != null && prevAlt > newAlt) {
+    const diff = prevAlt - newAlt;
+    const ratio = diff / prevAlt;
+    if (diff >= CONFIG.ALTITUDE_DROP_MIN_M && ratio >= CONFIG.ALTITUDE_DROP_RATIO) {
+      chain._altDropping = true;
+      RadarAudio.playAltDropSignal();
+    }
+  } else if (prevAlt != null && newAlt > prevAlt + 100) {
+    chain._altDropping = false;
+  }
+  chain.altitude = newAlt;
+  chain._labelTime = msgMs;
+}
+
+/* ============ 10. AUDIO ============ */
+const RadarAudio = (() => {
+  let ctx = null, lastSoundAt = 0, lastAltSignalAt = 0, lastBallisticAlarmAt = 0;
+  function init() {
+    if (ctx) return ctx;
+    try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ctx = null; }
+    return ctx;
+  }
+  function unlock() { const c = init(); if (c && c.state === "suspended") c.resume().catch(()=>{}); }
+  function playBell() {
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    [{f:880,g:.30,d:1.1},{f:1760,g:.14,d:.7}].forEach(p => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "sine"; o.frequency.setValueAtTime(p.f, now);
+      g.gain.setValueAtTime(.0001, now);
+      g.gain.exponentialRampToValueAtTime(p.g, now + .012);
+      g.gain.exponentialRampToValueAtTime(.0001, now + p.d);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(now); o.stop(now + p.d + .05);
+    });
+  }
+  function playAlert(force) {
+    if (!CONFIG.SOUND_ENABLED) return;
+    const now = Date.now();
+    if (!force && now - lastSoundAt < CONFIG.SOUND_COOLDOWN_MS) return;
+    lastSoundAt = now;
+    const c = init(); if (!c) return;
+    try { if (c.state === "suspended") c.resume(); playBell(); } catch (e) {}
+  }
+  function playAltDropSignal() {
+    if (!CONFIG.SOUND_ENABLED) return;
+    const c = init(); if (!c) return;
+    if (c.state === "suspended") c.resume();
+    const now = Date.now();
+    if (now - lastAltSignalAt < CONFIG.ALTITUDE_DROP_COOLDOWN_MS) return;
+    lastAltSignalAt = now;
+    const t = c.currentTime;
+    [700, 550, 400, 300].forEach((freq, i) => {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = "sawtooth";
+      o.frequency.setValueAtTime(freq, t + i*0.16);
+      g.gain.setValueAtTime(.0001, t + i*0.16);
+      g.gain.linearRampToValueAtTime(.32, t + i*0.16 + 0.02);
+      g.gain.exponentialRampToValueAtTime(.0001, t + i*0.16 + 0.15);
+      o.connect(g); g.connect(c.destination);
+      o.start(t + i*0.16); o.stop(t + i*0.16 + 0.17);
+    });
+  }
+  function triggerSirenSequence(dur = 3000, times = 1) {
+    const c = init(); if (!c) return;
+    if (c.state === "suspended") c.resume();
+    for (let i = 0; i < times; i++) {
+      const t0 = c.currentTime + i * (dur/1000 + 0.25);
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = "sawtooth";
+      o.frequency.setValueAtTime(440, t0);
+      o.frequency.linearRampToValueAtTime(880, t0 + 0.75);
+      o.frequency.linearRampToValueAtTime(440, t0 + 1.5);
+      o.frequency.linearRampToValueAtTime(880, t0 + 2.25);
+      o.frequency.linearRampToValueAtTime(440, t0 + 3);
+      g.gain.setValueAtTime(.0001, t0);
+      g.gain.linearRampToValueAtTime(.3, t0 + 0.1);
+      g.gain.linearRampToValueAtTime(.0001, t0 + 3);
+      o.connect(g); g.connect(c.destination);
+      o.start(t0); o.stop(t0 + 3.05);
+    }
+    const b = $("sirenBtn"); if (b) { b.classList.add("active"); setTimeout(()=>b.classList.remove("active"), dur*times); }
+  }
+  return { init, unlock, playAlert, playAltDropSignal, triggerSirenSequence };
+})();
+
+/* ============ 11. MAP ============ */
+let map = null, osmLayer = null, baseSat = null, openMapTilesLayer = null;
+const threatLayer = L.layerGroup();
+const msgThreatLayer = L.layerGroup();
+const impactLayer = L.layerGroup();
+const alertLayer = L.layerGroup();
+const settlementsLayer = L.layerGroup();
+const strategicLayer = L.layerGroup();
+const infraLayer = L.layerGroup();
+let ringsLayer = null, powerLayer = null;
+let ringsVisible = false, settlementsVisible = false, strategicVisible = false, powerVisible = false;
+let infraMode = 0;
+
+function initMap() {
+  try { map = L.map("map", { center: CONFIG.KYIV, zoom: 6, zoomControl: false }); }
+  catch (e) { return; }
+  L.control.zoom({ position: "bottomright" }).addTo(map);
+  L.control.scale({ position: "bottomleft", metric: true }).addTo(map);
+  baseSat = L.layerGroup();
+  L.tileLayer(CONFIG.TILE_URL_SAT, { maxZoom: 19, attribution: CONFIG.TILE_ATTR_SAT }).addTo(baseSat);
+  L.tileLayer(CONFIG.TILE_URL_SAT_REF, { maxZoom: 19, opacity: .9 }).addTo(baseSat);
+  baseSat.addTo(map);
+  osmLayer = L.tileLayer(CONFIG.TILE_URL, { maxZoom: 19, attribution: CONFIG.TILE_ATTR });
+  openMapTilesLayer = L.tileLayer("https://api.maptiler.com/maps/openstreetmap/{z}/{x}/{y}.png?key=5hFSPO5KgIEPvjTUfd7L", { maxZoom: 19 });
+  threatLayer.addTo(map); msgThreatLayer.addTo(map); impactLayer.addTo(map); alertLayer.addTo(map);
+  ringsLayer = L.layerGroup();
+  L.circle(CONFIG.KYIV, { radius: CONFIG.ZONE_RADIUS_KM*1000, color:"#3b82f6", weight:1.2, fill:false, dashArray:"6 6" }).addTo(ringsLayer);
+  map.on("zoomend", () => { if (settlementsVisible) updateSettlementsVisibility(); });
+}
+
+/* ============ 12. STATE ============ */
+const State = (() => {
+  const tracks = new Map(), msgMarkers = new Map(), impactReports = new Map();
+  const trails = new Map(), chainAnimations = new Map(), dismissedKeys = new Map();
+  function isDismissed(key) {
+    if (!key) return false;
+    const ts = dismissedKeys.get(key);
+    if (!ts) return false;
+    if (Date.now() - ts > CONFIG.DISMISS_TTL_MS) { dismissedKeys.delete(key); return false; }
+    return true;
+  }
+  function dismiss(key) { if (key) dismissedKeys.set(key, Date.now()); }
+  function closeTrailInternal(key) {
+    const chain = trails.get(key);
+    if (!chain) return;
+    if (chain._activePopup) try { map.closePopup(chain._activePopup); } catch (e) {}
+    if (chain.markerRef && chain.markerRef.marker && msgThreatLayer) try { msgThreatLayer.removeLayer(chain.markerRef.marker); } catch (e) {}
+    if (chain.polyline && map) try { map.removeLayer(chain.polyline); } catch (e) {}
+    if (chain._coneLayer && map) try { map.removeLayer(chain._coneLayer); } catch (e) {}
+    const anim = chainAnimations.get(key);
+    if (anim && anim.rafId) cancelAnimationFrame(anim.rafId);
+    chainAnimations.delete(key);
+    trails.delete(key);
+  }
+  function removeTrackInternal(id) {
+    const tr = tracks.get(id);
+    if (!tr) return;
+    if (tr.marker && threatLayer) try { threatLayer.removeLayer(tr.marker); } catch (e) {}
+    if (tr._coneLayer && map) try { map.removeLayer(tr._coneLayer); } catch (e) {}
+    tracks.delete(id);
+  }
+  function clearAll() {
+    msgMarkers.forEach(o => { if (o.marker && msgThreatLayer) try { msgThreatLayer.removeLayer(o.marker); } catch (e) {} if (o._simTimer) clearInterval(o._simTimer); });
+    msgMarkers.clear();
+    tracks.forEach(tr => { if (tr.marker && threatLayer) try { threatLayer.removeLayer(tr.marker); } catch (e) {} });
+    tracks.clear();
+    for (const key of [...trails.keys()]) closeTrailInternal(key);
+    impactReports.forEach(r => { if (r.marker && impactLayer) try { impactLayer.removeLayer(r.marker); } catch (e) {} });
+    impactReports.clear();
+    if (alertLayer) alertLayer.clearLayers();
+  }
+  return { tracks, msgMarkers, impactReports, trails, chainAnimations, dismissedKeys, isDismissed, dismiss, closeTrailInternal, removeTrackInternal, clearAll };
+})();
+
+/* ============ 13. POPUP ============ */
+const Popup = (() => {
+  function buildThreat(tx, eta) {
+    const meta = getMeta(tx.type);
+    const label = tx._exactName || meta.label;
+    const loc = [tx.locality, tx.district, tx.region].filter(Boolean).join(", ") || "—";
+    const altLine = tx._altitude != null ? `<div class="popup-alt">📌 Висота: <b>${formatAlt(tx._altitude)}</b></div>` : "";
+    const speedLine = tx._speed ? `<div class="popup-speed">⚡ <b>${tx._speed} км/год</b></div>` : "";
+    const etaLine = eta != null && eta > 0 ? `<div class="popup-eta">⏱ Підліт: <b>${formatEta(eta)}</b></div>` : "";
+    const removeBtn = `<button type="button" class="popup-remove-btn" data-remove-kind="track" data-remove-key="${esc(tx.id||"")}">🗑 Видалити</button>`;
+    return `<div class="popup-title">${esc(label)}</div>${speedLine}${etaLine}${altLine}<div class="popup-meta">Місце: ${esc(loc)}</div>${removeBtn}`;
+  }
+  function buildImpact(r) {
+    const tt = new Date(r.lastSeen).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const chList = [...r.channels].map(ch => `<span class="ch ${channelClass(ch)}">${esc(ch)}</span>`).join(" ");
+    const key = r._key || `impact|${r.report.kind}|${r.name}`;
+    return `<div class="popup-title" style="color:${r.report.color}">${r.report.icon} ${esc(r.report.label)}</div><div class="popup-meta"><b>${esc(r.name)}</b><br>${r.lat.toFixed(3)}, ${r.lon.toFixed(3)}<br>Джерел: <b>${r.channels.size}</b> · ${tt}</div><div class="popup-channels">${chList}</div><button type="button" class="popup-remove-btn" data-remove-kind="impact" data-remove-key="${esc(key)}">🗑</button>`;
+  }
+  function buildTrail(chain) {
+    const meta = getMeta(chain.cls.type);
+    const label = chain.exactName || meta.label;
+    const pointsHtml = chain.points.slice(-20).map((p, i) => {
+      const time = new Date(p.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      return `<div class="pt-point"><span class="pt-place">${esc(p.name)}</span><span class="pt-time">${time}</span></div>`;
+    }).join("");
+    const _uniqCh = uniqueChannels(chain.channels);
+    const channelList = [..._uniqCh].map(ch => `<span class="ch ${channelClass(ch)}">${esc(ch)}</span>`).join(" ");
+    const last = chain.points[chain.points.length - 1];
+    const eta = last ? etaToKyivMin(last.lat, last.lon, chain.cls.type, chain.speedLive) : null;
+    const speedLine = chain.speedLive ? `<div class="popup-speed">📡 Реальна: <b>${chain.speedLive} км/год</b></div>` : "";
+    const altLine = chain.altitude != null ? `<div class="popup-alt">${chain._altDropping ? "▼" : "▲"} Висота: <b>${formatAlt(chain.altitude)}</b>${chain._altDropping ? " · ЗНИЖЕННЯ" : ""}</div>` : "";
+    const etaLine = eta != null ? `<div class="popup-eta">⏱ ETA: <b>${formatEta(eta)}</b></div>` : "";
+    const toggleBtn = `<button type="button" class="popup-toggle-btn" data-toggle-trail="${esc(chain._key||"")}">📌 Траєкторія</button>`;
+    const removeBtn = `<button type="button" class="popup-remove-btn" data-remove-kind="msg" data-remove-key="${esc(chain._key||"")}">🗑</button>`;
+    const routeLine = chain.route && chain.route.length >= 2 ? `<div class="popup-route">📍 Маршрут: ${chain.route.map(p => esc(p.name)).join(' → ')}</div>` : "";
+    return `<div class="popup-title">${esc(label)} #${chain._trackId}</div>${speedLine}${altLine}${etaLine}${routeLine}<div class="popup-trail"><div class="pt-title">Траєкторія · ${chain.points.length} точок</div>${pointsHtml}</div><div class="popup-channels"><b>Джерела (${_uniqCh.size}):</b><br>${channelList}</div>${toggleBtn}${removeBtn}`;
+  }
+  return { buildThreat, buildImpact, buildTrail };
+})();
+
+/* ============ 14. TARGET PARSER ============ */
+const MOVEMENT_PATTERNS = [
+  /(?:^|\s)(?:з|із|из|с|от|від)\s+[^,.!?]{2,60}?\s+(?:на|до|в|у|по|через)\s+/i,
+  /(?:курсом|прямує|прямують|летить|летять|рухається|рухаються|йде|йдуть|направляється)/i,
+  /(?:шахед|шахеди|герань|гербера|бпла|дрон|дрони|ракет[аиуы]|баліст[иі]к[аиу]|ціль|цілі|група|групи)\s+(?:на|до|в|у|по|через|над)\s+/i
+];
+function hasMovement(text) { return text ? MOVEMENT_PATTERNS.some(re => re.test(norm(text))) : false; }
+const TARGET_RE = /(?:курс(?:ом)?\s+на|в\s+напрямку|у\s+напрямк|у\s+бік|летить\s+на|рухається\s+на|прямує\s+на)\s*([А-ЯІЇЄҐа-яіїєґ'’\-]+(?:\s+[А-ЯІЇЄҐа-яіїєґ][а-яіїєґ'’\-]+){0,3})/i;
+function getTargetPlace(text) {
+  if (!text) return null;
+  const m = TARGET_RE.exec(text);
+  if (!m) return null;
+  return findPlaceInText(m[1].trim());
+}
+function parseTarget(text) {
+  if (!text) return null;
+  const nt = norm(text);
+  if (!hasMovement(nt)) return null;
+  const places = [];
+  for (const s of text.split(/[.!?\n]+/)) {
+    const p = findPlaceInText(s.trim());
+    if (p && !places.some(x => x.key === p.key)) places.push(p);
+  }
+  if (!places.length) return null;
+  let fromPoint = null, toPoint = null;
+  const mFromTo = nt.match(/(?:^|\s)(?:з|із|с|від)\s+([^,.!?]{2,40}?)\s+(?:на|до|в|у|по|через)\s+([^,.!?]{2,40})/);
+  if (mFromTo) {
+    for (const p of places) {
+      const lbl = norm(p.name);
+      if (!fromPoint && mFromTo[1].includes(lbl)) fromPoint = p;
+      if (!toPoint && mFromTo[2].includes(lbl)) toPoint = p;
+    }
+  }
+  let route = [], routeConfidence = 'low';
+  if (fromPoint && toPoint) { route = [fromPoint, toPoint]; routeConfidence = 'high'; }
+  else if (places.length === 1) { route = places; routeConfidence = 'medium'; }
+  else route = places.slice(0, 3);
+  return { route, fromPoint, routeConfidence, sourceText: text };
+}
+const EVENT_TYPES_DB = [
+  { type: 'impact', re: /(?:прил[іi]т|прилет|влуч[аи]нн|попадан|влучив|вражено|поражен|досягла\s+цілі)/i },
+  { type: 'intercept', re: /(?:збит[тоя]|сбит[оы]|перехоплен|знищен)/i },
+  { type: 'debris', re: /(?:уламк|обломк|падінн|падени|впав|упал)/i },
+  { type: 'fire', re: /(?:пожеж|пожар|горит|задымлен)/i }
+];
+function detectEventTypes(text) {
+  if (!text) return [];
+  const found = [];
+  for (const et of EVENT_TYPES_DB) if (et.re.test(text)) found.push(et.type);
+  return [...new Set(found)];
+}
+function parseEvents(text) {
+  if (!text) return [];
+  const rawParts = text.split(/[▪️•●·\n;]+/).map(s => s.trim()).filter(s => s.length > 3);
+  const events = [];
+  for (const part of rawParts) {
+    const types = detectEventTypes(part);
+    if (!types.length) continue;
+    const place = findPlaceInText(part);
+    if (!place) continue;
+    for (const type of types) events.push({ type, lat: place.lat, lng: place.lon, place: place.name, sourceText: part });
+  }
+  return events;
+}
+
+/* ============ 15. IMPACT REPORTS ============ */
+const IMPACT_REPORTS_DB = [
+  {kind:"hit",icon:"💥",label:"Вибух / приліт",color:"#dc2626",re:/(?:прил[іi]т|прилет|влуч[аи]нн|попадан|влучив|вражено|поражен|удар\s+по|досягла\s+цілі)/i},
+  {kind:"down",icon:"🛬",label:"Падіння / зниження",color:"#fb923c",re:/(?:падає|падають|падінн|падени|впав|упал|знижується|втрачає\s+висоту|уламк|обломк)/i},
+  {kind:"shot",icon:"🛡️",label:"Збиття",color:"#16a34a",re:/(?:збит[тоя]|сбит[оы]|перехоплен|ліквідован|знищен)/i},
+  {kind:"fire",icon:"🔥",label:"Пожежа",color:"#f97316",re:/(?:пожеж|пожар|горит|задымлен)/i}
+];
+function isSummaryNews(text) {
+  if (!text) return false;
+  return /(?:протягом\s+(?:минулої|останньої)\s+доби|за\s+добу|внаслідок\s+обстріл|підсумки|офіційне\s+зведення)/i.test(text);
+}
+function detectImpactReports(text) {
+  if (!text) return [];
+  const found = [];
+  for (const r of IMPACT_REPORTS_DB) if (r.re.test(text)) found.push(r);
+  return found;
+}
+function addImpactReportMarker(report, place, ch, msgMs, text) {
+  const key = `impact|${report.kind}|${place.key}`;
+  if (State.isDismissed(key)) return;
+  let r = State.impactReports.get(key);
+  if (!r) {
+    r = { report, lat: place.lat, lon: place.lon, name: place.name, firstSeen: msgMs, lastSeen: msgMs, channels: new Set(), marker: null, text: text || "", _key: key };
+    State.impactReports.set(key, r);
+    if (isPriorityChannel(ch)) RadarAudio.playAlert(true);
+    const marker = L.marker([r.lat, r.lon], { icon: impactBigIcon(report.kind), zIndexOffset: 880 });
+    marker.bindPopup(Popup.buildImpact(r), CONFIG.POPUP_OPTS);
+    marker.addTo(impactLayer);
+    r.marker = marker;
+  }
+  r.channels.add(normalizeChannel(ch));
+  if (msgMs > r.lastSeen) r.lastSeen = msgMs;
+  if (r.marker) try { r.marker.setPopupContent(Popup.buildImpact(r)); } catch (e) {}
+}
+function processImpactReport(text, ch, msgMs) {
+  if (!text || isSummaryNews(text)) return;
+  const reports = detectImpactReports(text);
+  if (!reports.length) return;
+  for (const report of reports) {
+    let place = null;
+    const coords = parseCoordsFromText(text);
+    if (coords) place = { key: "coords:" + coords[0].toFixed(4) + "," + coords[1].toFixed(4), name: "Точка " + coords[0].toFixed(3), lat: coords[0], lon: coords[1] };
+    else place = findPlaceInText(text);
+    if (!place || place.lat == null) continue;
+    if (!inKyivOblast(place.lat, place.lon)) continue;
+    addImpactReportMarker(report, place, ch, msgMs, text);
+  }
+}
+function processParsedMapEvents(text, ch, msgMs, parsedEvents) {
+  if (!parsedEvents || !parsedEvents.length) return;
+  for (const ev of parsedEvents) {
+    if (ev.lat == null || ev.lng == null || !inKyivOblast(ev.lat, ev.lng)) continue;
+    const kindMap = { impact: "hit", intercept: "shot", debris: "down", fire: "fire" };
+    const kind = kindMap[ev.type];
+    if (!kind) continue;
+    const report = IMPACT_REPORTS_DB.find(r => r.kind === kind);
+    if (!report) continue;
+    const place = { key: "evt:" + ev.place + ":" + ev.lat.toFixed(3), name: ev.place || "Точка", lat: ev.lat, lon: ev.lng };
+    addImpactReportMarker(report, place, ch, msgMs, text);
+  }
+}
+function removeMarkerByKey(kind, key) {
+  try {
+    if (kind === "impact") { const r = State.impactReports.get(key); if (r && r.marker && impactLayer) impactLayer.removeLayer(r.marker); State.impactReports.delete(key); State.dismiss(key); }
+    else if (kind === "msg") { const o = State.msgMarkers.get(key); if (o) { if (o.marker && msgThreatLayer) msgThreatLayer.removeLayer(o.marker); if (o._simTimer) clearInterval(o._simTimer); } State.msgMarkers.delete(key); if (o && o.chainKey) State.closeTrailInternal(o.chainKey); State.dismiss(key); }
+    else if (kind === "track") { State.removeTrackInternal(key); State.dismiss(key); }
+    showToast("🗑 Видалено");
+  } catch (e) {}
+}
+window.removeMarkerByKey = removeMarkerByKey;
+
+/* ============ 16. API / TRACKS ============ */
+function normalizeThreat(t) {
+  const o = {...t};
+  const txt = [t.type, t.title, t.explanationShort].filter(Boolean).join(" ");
+  const cls = CLASSIFIER(txt);
+  if (cls && !TYPE_META[t.type]) o.type = cls.type;
+  o._exactName = detectExactName(txt) || null;
+  o._altitude = parseAltitude(t);
+  o._speed = resolveSpeedKmh(o.type, txt);
+  o._trackId = TrackIds.assign();
+  o._altDropping = false;
+  o._labelTime = Date.now();
+  o._etaMin = null;
+  o._speedReal = false;
+  return o;
+}
+function updateSmooth(tr, lat, lon, time, hdg) {
+  if (!tr._s) { tr._s = {lat, lon, vx:0, vy:0, hdg:hdg||0, lastT:time, spd:0}; return; }
+  const dt = (time - tr._s.lastT) / 3600000;
+  if (dt <= 0 || dt > .4) { tr._s.lat = lat; tr._s.lon = lon; tr._s.lastT = time; return; }
+  const dist = haversineKm(tr._s.lat, tr._s.lon, lat, lon);
+  const spd = dist / dt;
+  const brg = bearingBetween(tr._s.lat, tr._s.lon, lat, lon);
+  const a = CONFIG.SMOOTH_ALPHA;
+  tr._s.lat = tr._s.lat * (1-a) + lat * a;
+  tr._s.lon = tr._s.lon * (1-a) + lon * a;
+  const rad = brg * Math.PI / 180;
+  tr._s.vx = tr._s.vx * .55 + spd * Math.sin(rad) * .45;
+  tr._s.vy = tr._s.vy * .55 + spd * Math.cos(rad) * .45;
+  tr._s.spd = Math.hypot(tr._s.vx, tr._s.vy);
+  tr._s.hdg = (Math.atan2(tr._s.vx, tr._s.vy) * 180 / Math.PI + 360) % 360;
+  tr._s.lastT = time;
+}
+function upsertThreat(raw) {
+  try {
+    const tx = normalizeThreat(raw);
+    if (tx.lat == null || tx.lon == null || tx.areaOnly) return;
+    if (!inZone(tx.lat, tx.lon)) { State.removeTrackInternal(tx.id); return; }
+    let heading = tx.heading ?? bearingBetween(tx.lat, tx.lon, CONFIG.KYIV[0], CONFIG.KYIV[1]);
+    const baseTime = Date.now();
+    const existing = State.tracks.get(tx.id);
+    const speed = tx._speed || 180;
+    const eta = etaToKyivMin(tx.lat, tx.lon, tx.type, speed);
+    tx._labelTime = baseTime;
+    tx._etaMin = eta;
+    if (existing) {
+      updateSmooth(existing, tx.lat, tx.lon, baseTime, heading);
+      existing.threat = tx;
+      existing.heading = heading;
+      existing.speed = speed;
+      existing.eta = eta;
+      if (existing.marker) existing.marker.setIcon(makeIcon(tx, heading, 0, 0, false, false, null, null, false, false, false, speed));
+    } else {
+      const marker = L.marker([tx.lat, tx.lon], { icon: makeIcon(tx, heading, 0, 0, false, false, null, null, false, false, false, speed), zIndexOffset: 800 });
+      marker.addTo(threatLayer);
+      const tr = { id: tx.id, marker, threat: tx, heading, speed, eta, _s: {lat: tx.lat, lon: tx.lon, lastT: baseTime, hdg: heading, spd: 0, vx: 0, vy: 0} };
+      marker.on("click", (e) => { L.DomEvent.stopPropagation(e); activateMarker("api", tr.id); });
+      State.tracks.set(tx.id, tr);
+    }
+  } catch (e) { State.removeTrackInternal(raw?.id); }
+}
+function syncThreats(list) {
+  const arr = list || [];
+  if (!arr.length) return;
+  const seen = new Set();
+  for (const tx of arr) if (tx && tx.id != null) { seen.add(tx.id); upsertThreat(tx); }
+  for (const id of [...State.tracks.keys()]) if (!seen.has(id)) State.removeTrackInternal(id);
+}
+
+/* ============ 17. MESSAGE PROCESSOR ============ */
+function simulateMsgTrack(o, key) {
+  if (o._sim) return;
+  o._sim = true;
+  if (o._stopped) return;
+  const kmPerSec = (o.speed || 180) / 3600;
+  const hold = kyivHoldPoint();
+  o._simTimer = setInterval(() => {
+    if (!o.marker) { clearInterval(o._simTimer); return; }
+    if (o.chainKey && State.chainAnimations.has(o.chainKey)) return;
+    const ll = o.marker.getLatLng();
+    if (!ll) return;
+    const destLat = o.targetPlace && o.targetPlace.lat != null ? o.targetPlace.lat : hold.lat;
+    const destLon = o.targetPlace && o.targetPlace.lon != null ? o.targetPlace.lon : hold.lon;
+    const dDest = haversineKm(ll.lat, ll.lng, destLat, destLon);
+    const dKyiv = distToKyiv(ll.lat, ll.lng);
+    if (dDest < 0.2 || dKyiv < CONFIG.KYIV_HOLD_MIN_KM) {
+      clearInterval(o._simTimer);
+      o._simParked = true;
+      return;
+    }
+    const brg = bearingBetween(ll.lat, ll.lng, destLat, destLon);
+    const step = Math.min(kmPerSec, Math.max(dDest * 0.35, kmPerSec * 0.5));
+    const [nlat, nlon] = destPoint(ll.lat, ll.lng, brg, step);
+    o.marker.setLatLng([nlat, nlon]);
+    if (o.chainKey) {
+      const chain = State.trails.get(o.chainKey);
+      if (chain && !chain._stopped) {
+        const lastPt = chain.points[chain.points.length - 1];
+        const dist = lastPt ? haversineKm(lastPt.lat, lastPt.lon, nlat, nlon) : Infinity;
+        if (dist > CONFIG.SIM_TRAIL_MIN_DIST_KM) {
+          chain.points.push({ lat: nlat, lon: nlon, name: o.place?.name || "—", t: Date.now() });
+          if (chain.polyline) try { chain.polyline.setLatLngs(chain.points.map(p => [p.lat, p.lon])); } catch (e) {}
+        }
+      }
+    }
+  }, 1000);
+}
+function syncMessageThreats(messages) {
+  const now = Date.now();
+  const candidates = new Map();
+  for (let i = 0; i < (messages || []).length; i++) {
+    const m = messages[i];
+    const text = m.text || "";
+    const ch = normalizeChannel(m.channel || "unknown");
+    const msgMs = m.date ? Date.parse(m.date) : now;
+    if (!text || text.length < 8) continue;
+    try { BallisticTimer.check(text, msgMs); } catch (e) {}
+    Strategic.detect(text, ch, msgMs);
+    Mass.process(text, ch, msgMs);
+    processImpactReport(text, ch, msgMs);
+    const parsedTarget = parseTarget(text);
+    const parsedEvents = parseEvents(text);
+    if (parsedTarget || parsedEvents.length) {
+      try { processParsedMapEvents(text, ch, msgMs, parsedEvents); } catch (e) {}
+    }
+    const pa = parsePlaceAndAltitude(text);
+    if (pa) {
+      const key = "pa|" + pa.place.key;
+      if (!candidates.has(key)) candidates.set(key, { kind: "place", place: pa.place, cls: {type:"uav",label:"БПЛА"}, target: null, altitudeOverride: pa.altitude, channels: new Set(), firstSeen: msgMs, lastSeen: msgMs, sampleText: text, parsedTarget });
+      const c = candidates.get(key);
+      c.channels.add(ch); c.altitudeOverride = pa.altitude; c.lastSeen = Math.max(c.lastSeen, msgMs); c.sampleText = text;
+      continue;
+    }
+    const justAlt = isJustAltitude(text);
+    if (justAlt != null) continue;
+    const launches = extractLaunchStage(text);
+    if (launches.length) {
+      for (const lch of launches) {
+        const key = `reg|${lch.key}|${lch.cls.type}`;
+        if (!candidates.has(key)) candidates.set(key, { kind: lch.kind, origin: lch, cls: lch.cls, stage: lch.stage, region: { key: lch.key, name: lch.name, lat: lch.lat, lon: lch.lon }, target: lch.target, channels: new Set(), firstSeen: msgMs, lastSeen: msgMs, sampleText: text, parsedTarget });
+        const c = candidates.get(key);
+        c.channels.add(ch); c.lastSeen = Math.max(c.lastSeen, msgMs);
+      }
+      continue;
+    }
+    const extracted = extractPlaceAndType(text, ch);
+    if (extracted) {
+      const { place, cls, target, isApproach } = extracted;
+      const key = `msg|${place.key}|${cls.type}`;
+      const exactName = detectExactName(text);
+      const altFromText = parseAltitude(text);
+      if (!candidates.has(key)) candidates.set(key, { kind: "place", place, cls, target, isApproach, channels: new Set(), firstSeen: msgMs, lastSeen: msgMs, sampleText: text, exactName, parsedTarget, altitudeOverride: altFromText });
+      const c = candidates.get(key);
+      c.channels.add(ch); c.lastSeen = Math.max(c.lastSeen, msgMs);
+      if (exactName && !c.exactName) c.exactName = exactName;
+      if (parsedTarget && !c.parsedTarget) c.parsedTarget = parsedTarget;
+      if (altFromText != null) c.altitudeOverride = altFromText;
+      continue;
+    }
+  }
+  for (const [key, c] of candidates) {
+    if (State.isDismissed(key)) continue;
+    const _cs = confirmStats(c.channels);
+    const confirmN = _cs.confirmN, totalW = _cs.totalW, hasPrio = _cs.hasPrio;
+    const age = now - c.firstSeen;
+    if (age > CONFIG.STALE_MSG_MS) continue;
+    if (!hasPrio && confirmN < 1) continue;
+    if (c.kind === "place") {
+      const { place, cls, target } = c;
+      if (place.lat == null || place.lon == null || !inZone(place.lat, place.lon)) continue;
+      const alt = c.altitudeOverride != null ? c.altitudeOverride : parseAltitude({ explanationShort: c.sampleText });
+      const falling = isFallingMessage(c.sampleText);
+      const exactName = c.exactName || detectExactName(c.sampleText);
+      let hdg = null;
+      if (place._heading != null) hdg = place._heading;
+      else if (place._targetLat != null) hdg = bearingBetween(place.lat, place.lon, place._targetLat, place._targetLon);
+      else if (target) hdg = bearingBetween(place.lat, place.lon, target.lat, target.lon);
+      else hdg = bearingBetween(place.lat, place.lon, CONFIG.KYIV[0], CONFIG.KYIV[1]);
+      const speed = resolveSpeedKmh(cls.type, c.sampleText);
+      const eta = etaToKyivMin(place.lat, place.lon, cls.type, speed);
+      const _rk = resolveTrailKey(cls, (target && target.lat != null) ? target : place, c.sampleText, msgMs, null);
+      const chainKey = _rk.key;
+      const { chain } = appendTrailPoint(chainKey, cls, { lat: place.lat, lon: place.lon, name: (target && target.name) || place.name, sampleText: c.sampleText, exactName, _falling: falling }, ch, msgMs, c.parsedTarget);
+      if (alt != null) updateChainAltitude(chain, alt, msgMs);
+      chain.heading = hdg;
+      chain._falling = chain._falling || falling;
+      cls._trackId = chain._trackId;
+      cls._chainKey = chainKey;
+      cls._altitude = chain.altitude;
+      cls._speedReal = chain._speedReal;
+      cls._altDropping = chain._altDropping;
+      cls._labelTime = chain._labelTime || msgMs;
+      cls._etaMin = eta;
+      const last = chain.points[chain.points.length - 1];
+      let markerRef = chain.markerRef;
+      if (markerRef && markerRef.marker) {
+        markerRef.marker.setLatLng([last.lat, last.lon]);
+        markerRef.marker.setIcon(makeIcon(cls, hdg, confirmN, totalW, false, false, null, null, false, hasPrio, false, chain.speedLive || speed));
+      } else {
+        const marker = L.marker([last.lat, last.lon], { icon: makeIcon(cls, hdg, confirmN, totalW, false, false, null, null, false, hasPrio, false, chain.speedLive || speed), zIndexOffset: 900 });
+        marker.addTo(msgThreatLayer);
+        marker.on("click", (e) => { L.DomEvent.stopPropagation(e); activateMarker("msg", chainKey); });
+        markerRef = { marker };
+        chain.markerRef = markerRef;
+      }
+      const opts = { id: key, marker: markerRef.marker, lastSeen: c.lastSeen, firstSeen: c.firstSeen, alt: chain.altitude, hdg, cls, place, targetPlace: target, eta, confirmN, channels: c.channels, heading: hdg, speedKmh: chain.speedLive || speed, chainKey, _sim: false, hasPriority: hasPrio, exactName };
+      State.msgMarkers.set(key, opts);
+      simulateMsgTrack(opts, key);
+      continue;
+    }
+    if (c.kind === "strategic") {
+      const { region, cls, origin } = c;
+      if (region.lat == null) continue;
+      const originName = origin?.name || region.name || "—";
+      const fakeThreat = { type: cls.type, _trackId: null };
+      if (State.msgMarkers.has(key)) { const old = State.msgMarkers.get(key); if (old.marker) msgThreatLayer.removeLayer(old.marker); }
+      const marker = L.marker([region.lat, region.lon], { icon: makeIcon(fakeThreat, null, confirmN, totalW, false, false, null, "ready", false, hasPrio, false), zIndexOffset: 930 });
+      marker.bindPopup(`<div class="popup-title">Стратег ${esc(cls.label)}</div><div>${esc(c.sampleText.slice(0, 220))}</div><div class="popup-meta"><b>${esc(originName)}</b></div>`, CONFIG.POPUP_OPTS);
+      marker.addTo(msgThreatLayer);
+      State.msgMarkers.set(key, { marker, lastSeen: c.lastSeen, firstSeen: c.firstSeen, cls, place: {name:originName,lat:region.lat,lon:region.lon}, isRegion: true, hasPriority: hasPrio });
+      continue;
+    }
+  }
+  for (const [key, r] of [...State.impactReports]) {
+    if (r.lastSeen < now - CONFIG.IMPACT_REPORT_TTL_MS) {
+      if (r.marker && impactLayer) try { impactLayer.removeLayer(r.marker); } catch (e) {}
+      State.impactReports.delete(key);
+    }
+  }
+  for (const [key, o] of [...State.msgMarkers]) {
+    if (now - o.lastSeen > CONFIG.STALE_MSG_MS) {
+      if (o.marker && msgThreatLayer) msgThreatLayer.removeLayer(o.marker);
+      if (o._simTimer) clearInterval(o._simTimer);
+      State.msgMarkers.delete(key);
+    }
+  }
+  try { updateBottomCard(); } catch (e) {}
+  try { updateDescentBanner(); } catch (e) {}
+}
+
+/* ============ 18. LAUNCH EXTRACTION ============ */
+const THREAT_RE = /загроза|угроза|можлив|готов|підготовк/i;
+const LAUNCH_RE = /пуск|запуск|старт|зліт|взлет|летить|рухається|курсує/i;
+const NO_LAUNCH_RE = /без\s+пуск|поки\s+що\s+без|не\s+спостеріга|не\s+підтверджен|скасован|відмінено/i;
+const NON_AIR_CONTEXT_RE = /(?:диверс|партизан|АТЕШ|атеш|саботаж|підпал|підрив|немає\s+ніяких|авіація\s+НАТО|батальйон|бригад|розібрал|на\s+частини|запчастин)/i;
+const CLEAR_RE = /відбій|отбой|чисто|без\s+загроз|наразі\s+чисто|небезпека\s+минула/i;
+const RE_DIRS = [
+  { re: /північно-?західн|пн\.?\s*-?\s*зх/i, deg: 315 },{ re: /північно-?східн|пн\.?\s*-?\s*сх/i, deg: 45 },
+  { re: /південно-?західн|пд\.?\s*-?\s*зх/i, deg: 225 },{ re: /південно-?східн|пд\.?\s*-?\s*сх/i, deg: 135 },
+  { re: /північн|пн\b/i, deg: 0 },{ re: /південн|пд\b/i, deg: 180 },
+  { re: /західн|зх\b/i, deg: 270 },{ re: /східн|сх\b/i, deg: 90 }
+];
+const LAUNCH_ORIGINS = [
+  {key:"курск",re:/курськ|курск/i,name:"Курськ",lat:51.73,lon:36.19},
+  {key:"белгород",re:/белгород|бєлгород/i,name:"Белгород",lat:50.60,lon:36.59},
+  {key:"брянск",re:/брянськ|брянск/i,name:"Брянск",lat:53.25,lon:34.37},
+  {key:"воронеж",re:/воронеж/i,name:"Воронеж",lat:51.67,lon:39.18},
+  {key:"чауда",re:/чауда/i,name:"Чауда",lat:45.00,lon:35.83},
+  {key:"джанкой",re:/джанкой/i,name:"Джанкой",lat:45.71,lon:34.39},
+  {key:"керч",re:/керч|керчь/i,name:"Керч",lat:45.35,lon:36.47},
+  {key:"ростов",re:/ростов/i,name:"Ростов",lat:47.24,lon:39.70}
+];
+function findLaunchOriginsInText(text) {
+  const found = [];
+  for (const o of LAUNCH_ORIGINS) if (o.re.test(text||"")) found.push(o);
+  return found;
+}
+function nearestRussianOrigin(lat, lon) {
+  let best = null, bestD = Infinity;
+  for (const o of LAUNCH_ORIGINS) { const d = haversineKm(lat, lon, o.lat, o.lon); if (d < bestD) { bestD = d; best = o; } }
+  return { origin: best, dist: bestD };
+}
+const OBSERVED_RE = /(?:повз|через|біля|над)\s+([А-ЯІЇЄҐа-яіїєґ'’\-]{3,30})/i;
+function getObservedPlace(text) {
+  const m = OBSERVED_RE.exec(text||""); if (!m) return null;
+  return findPlaceInText(m[1].trim());
+}
+function extractLaunchStage(text) {
+  if (!text || NON_AIR_CONTEXT_RE.test(text) || CLEAR_RE.test(text)) return [];
+  const cls = CLASSIFIER(text);
+  if (!cls) return [];
+  if (NO_LAUNCH_RE.test(text)) return [];
+  const stage = LAUNCH_RE.test(text) ? "launch" : "threat";
+  if (cls.isMig) return [];
+  const tgt = getTargetPlace(text);
+  const res = [];
+  for (const o of findLaunchOriginsInText(text)) res.push({ kind: "origin", key: o.key, name: o.name, region: o.name, lat: o.lat, lon: o.lon, cls, stage, target: tgt });
+  return res;
+}
+function extractPlaceAndType(text, channel) {
+  if (!text || NON_AIR_CONTEXT_RE.test(text) || CLEAR_RE.test(text)) return null;
+  if (NO_LAUNCH_RE.test(text)) return null;
+  const cls = CLASSIFIER(text);
+  if (!cls || cls.isMig) return null;
+  if (OBSERVATION_TYPES.has(cls.type)) return null;
+  const obs = getObservedPlace(text), tgt = getTargetPlace(text);
+  let place = null, isApproach = false;
+  if (tgt) {
+    let sourceBearing = null;
+    for (const d of RE_DIRS) if (d.re.test(text)) { sourceBearing = d.deg; break; }
+    if (sourceBearing == null) {
+      const src = nearestRussianOrigin(tgt.lat, tgt.lon);
+      sourceBearing = (src.origin && src.dist > 30) ? bearingBetween(src.origin.lat, src.origin.lon, tgt.lat, tgt.lon) : 180;
+    }
+    const [lat, lon] = destPoint(tgt.lat, tgt.lon, sourceBearing, CONFIG.APPROACH_OFFSET_KM);
+    place = { key: "approach_" + tgt.key, name: tgt.name, lat, lon, _approach: true, _targetLat: tgt.lat, _targetLon: tgt.lon, _heading: (sourceBearing + 180) % 360 };
+    isApproach = true;
+  } else if (obs) {
+    let moveBearing = 0;
+    for (const d of RE_DIRS) if (d.re.test(text)) { moveBearing = d.deg; break; }
+    const [lat, lon] = destPoint(obs.lat, obs.lon, moveBearing, CONFIG.APPROACH_OFFSET_KM);
+    place = { key: obs.key, name: obs.name, lat, lon, _heading: moveBearing };
+  } else {
+    place = findPlaceInText(text);
+  }
+  if (!place) return null;
+  return { place, cls, target: tgt, isApproach };
+}
+
+/* ============ 19. ALERTS / MASS / STRATEGIC ============ */
+const BallisticTimer = (() => {
+  const BALLISTIC_RE = /балістік|баллистик|кинжал|кінжал|іскандер|искандер|кн[\s\-]?23|циркон|zircon/i;
+  let startedAt = 0, tickTimer = null;
+  function render() {
+    const el = $("ballisticTimer"); if (!el) return;
+    const left = startedAt ? Math.max(0, CONFIG.BALLISTIC_COUNTDOWN_MS - (Date.now() - startedAt)) : 0;
+    if (!startedAt || left <= 0) { el.classList.remove("show"); return; }
+    el.textContent = "🚨 " + Math.ceil(left / 1000) + "s";
+    el.classList.add("show");
+  }
+  function ensureTicker() {
+    if (tickTimer) return;
+    tickTimer = setInterval(() => {
+      if (!startedAt || Date.now() - startedAt >= CONFIG.BALLISTIC_COUNTDOWN_MS) { clearInterval(tickTimer); tickTimer = null; startedAt = 0; }
+      render();
+    }, 200);
+  }
+  function check(text, msgMs) {
+    if (!text || !BALLISTIC_RE.test(text)) return false;
+    const now = Date.now();
+    let ts = msgMs && Number.isFinite(msgMs) ? msgMs : now;
+    if (now - ts > CONFIG.BALLISTIC_MSG_MAX_AGE_MS) return false;
+    if (!startedAt) { startedAt = ts; ensureTicker(); RadarAudio.triggerSirenSequence(3000, 3); }
+    render();
+    return true;
+  }
+  return { check };
+})();
+
+const Alerts = (() => {
+  const seen = new Map();
+  let timer = null;
+  function isSummary(text) { return /(?:протягом\s+доби|за\s+добу|підсумки|офіційне\s+зведення)/i.test(text||""); }
+  function showTopAlert({kind, icon, title, place, meta, rawText}) {
+    const el = $("topAlert"); if (!el) return;
+    if (isSummary(rawText) || isSummary(meta)) return;
+    const key = (kind||"") + "|" + (place||"");
+    const now = Date.now();
+    const prev = seen.get(key);
+    if (prev && (now - prev) < 30*60*1000) return;
+    seen.set(key, now);
+    el.className = "top-alert show " + kind;
+    const iconEl = $("topAlertIcon"), titleEl = $("topAlertTitle"), placeEl = $("topAlertPlace"), metaEl = $("topAlertMeta");
+    if (iconEl) iconEl.textContent = icon || "🚨";
+    if (titleEl) titleEl.textContent = title || "—";
+    if (place) { if (placeEl) { placeEl.textContent = place; placeEl.style.display = "block"; } }
+    if (meta) { if (metaEl) { metaEl.textContent = meta; metaEl.style.display = "block"; } }
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(hideTopAlert, 20000);
+  }
+  function hideTopAlert() {
+    const el = $("topAlert");
+    if (el) el.classList.remove("show");
+    if (timer) { clearTimeout(timer); timer = null; }
+  }
+  return { showTopAlert, hideTopAlert };
+})();
+
+const Mass = (() => {
+  const TRIGGER_RE = /(?:пуск[и]?\s+реактивних|залп[и]?\s+реактивних|підвіз\s+балістичних|доставка\s+шахед|шахед[іи]?\s+на\s+аеродром)/i;
+  let bannerTimer = null, active = false;
+  function detect(text) {
+    if (!text || !TRIGGER_RE.test(text)) return null;
+    const lines = [];
+    let title = "МАСОВАНА ЗАГРОЗА";
+    if (/пуск|залп/i.test(text) && /реактивн/i.test(text)) { title = "🚀 ПУСКИ РЕАКТИВНИХ БПЛА"; lines.push("Напрямок: невідомий"); }
+    return { title, icon: "🚀", lines };
+  }
+  function showBanner(info, ch) {
+    const el = $("massBanner"); if (!el) return;
+    if ($("massBannerTitle")) $("massBannerTitle").textContent = info.title;
+    const l1 = $("massBannerLine1"), l2 = $("massBannerLine2");
+    if (l1) l1.innerHTML = info.lines[0] || "—";
+    if (l2) l2.style.display = "none";
+    el.classList.add("show");
+    active = true;
+    if (bannerTimer) clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(hideBanner, 60000);
+    if (ch && isPriorityChannel(ch)) RadarAudio.playAlert(true);
+  }
+  function hideBanner() { const el = $("massBanner"); if (el) el.classList.remove("show"); active = false; }
+  function process(text, ch, msgMs) {
+    if (!text || (!isPriorityChannel(ch) && channelWeight(ch) < 1.3)) return;
+    const info = detect(text);
+    if (info) showBanner(info, ch);
+  }
+  return { process, hideBanner, isActive: () => active };
+})();
+
+const Strategic = (() => {
+  function detect(text, ch, msgMs) { /* спрощено */ }
+  function removeKey(key) {}
+  function rebuildPanel() {}
+  return { detect, removeKey, rebuildPanel };
+})();
+
+/* ============ 20. LAYERS ============ */
+function rebuildPowerLayer() {
+  if (powerLayer) { try { map.removeLayer(powerLayer); } catch (e) {} powerLayer = null; }
+  if (!powerVisible) return;
+  powerLayer = L.layerGroup();
+  for (const [name, lat, lng, voltage, district] of KYIV_SUBSTATIONS) {
+    const color = voltage === "750" ? "#dc2626" : voltage === "330" ? "#f97316" : "#facc15";
+    const m = L.circleMarker([lat, lng], { radius: 6, color, weight: 2, fillColor: color, fillOpacity: 0.7 });
+    m.bindPopup(`<div class="popup-title">⚡ ${esc(name)}</div><div class="popup-meta">${voltage} kV · ${esc(district)}</div>`);
+    m.addTo(powerLayer);
+  }
+  powerLayer.addTo(map);
+}
+function togglePowerLayer() {
+  powerVisible = !powerVisible;
+  try { localStorage.setItem("kyiv_power_vis_v1", powerVisible ? "1" : "0"); } catch (e) {}
+  const b = $("btnPower"); if (b) b.classList.toggle("on", powerVisible);
+  rebuildPowerLayer();
+  showToast(powerVisible ? "⚡ ПС ON" : "⚡ ПС OFF");
+}
+function rebuildInfraLayer() {
+  infraLayer.clearLayers();
+  if (!infraMode) { if (map.hasLayer(infraLayer)) map.removeLayer(infraLayer); return; }
+  if (!map.hasLayer(infraLayer)) infraLayer.addTo(map);
+  if (infraMode === 1 || infraMode === 4) {
+    for (const b of KYIV_BRIDGES) {
+      const m = L.marker([b.lat, b.lng], { icon: L.divIcon({ className:"infra-marker", html:`<div class="infra-bridge">🌉</div>`, iconSize:[22,22], iconAnchor:[11,11] }) });
+      m.bindPopup(`<div class="popup-title">🌉 ${esc(b.name)}</div><div class="popup-meta">${esc(b.district)}</div>`);
+      m.addTo(infraLayer);
+    }
+  }
+  if (infraMode === 2 || infraMode === 4) {
+    for (const e of ENERGY_DB) {
+      const m = L.marker([e.lat, e.lng], { icon: L.divIcon({ className:"infra-marker", html:`<div class="infra-energy">🏭</div>`, iconSize:[22,22], iconAnchor:[11,11] }) });
+      m.bindPopup(`<div class="popup-title">⚡ ${esc(e.name)}</div><div class="popup-meta">${e.category}</div>`);
+      m.addTo(infraLayer);
+    }
+  }
+}
+function cycleInfraMode() {
+  infraMode = (infraMode + 1) % 5;
+  const b = $("btnInfra");
+  if (b) { b.classList.remove("on","infrastructure","energy","incidents"); if (infraMode === 1) b.classList.add("infrastructure"); else if (infraMode === 2) b.classList.add("energy"); else if (infraMode === 4) b.classList.add("on"); }
+  rebuildInfraLayer();
+  showToast(["🏗 OFF","🏗 Мости","🏗 Енергетика","🏗 Інциденти","🏗 Все"][infraMode]);
+}
+function buildSettlementsLayer() {
+  settlementsLayer.clearLayers();
+  const z = map.getZoom();
+  if (z < 11) return;
+  const max = z >= 13 ? 9999 : (z >= 12 ? 400 : 150);
+  let count = 0;
+  for (const rec of KYIV_OBLAST_SETTLEMENTS) {
+    if (count >= max) break;
+    const icon = L.divIcon({ className: "settlement-marker", html: `<div class="settlement-dot ${rec[4]==="c"?"city":""}"></div>`, iconSize: [8,8], iconAnchor: [4,4] });
+    L.marker([rec[1], rec[2]], { icon, interactive: false }).addTo(settlementsLayer);
+    count++;
+  }
+}
+function updateSettlementsVisibility() {
+  if (!map) return;
+  const z = map.getZoom();
+  if (settlementsVisible && z >= 11) { if (!map.hasLayer(settlementsLayer)) settlementsLayer.addTo(map); buildSettlementsLayer(); }
+  else { if (map.hasLayer(settlementsLayer)) map.removeLayer(settlementsLayer); }
+}
+function toggleSettlementsLayer() {
+  settlementsVisible = !settlementsVisible;
+  const b = $("btnSettlements"); if (b) b.classList.toggle("on", settlementsVisible);
+  updateSettlementsVisibility();
+  showToast(settlementsVisible ? "🏘 ON" : "🏘 OFF");
+}
+function toggleStrategicLayer() {
+  strategicVisible = !strategicVisible;
+  const b = $("btnStrategic"); if (b) b.classList.toggle("on", strategicVisible);
+  showToast(strategicVisible ? "✈️ ON" : "✈️ OFF");
+}
+
+/* ============ 21. VISUAL ENHANCEMENTS ============ */
+const TrackIds = (() => {
+  let next = 1; const used = new Set();
+  function assign() {
+    while (used.has(next)) next++;
+    const id = next++; used.add(id);
+    if (used.size > 1000) { used.clear(); next = 1; }
+    return id;
+  }
+  return { assign };
+})();
+const VIS_FLAGS = { ids: true, cones: true, eta: true, alt: true, speed: true, course: false, now: true, descent: true, card: true, labelsAll: false };
+let activeMarkerKey = null;
+let activeMarkerType = null;
+try {
+  const saved = JSON.parse(localStorage.getItem("radar_vis_flags_v1") || "{}");
+  for (const k of Object.keys(VIS_FLAGS)) if (typeof saved[k] === "boolean") VIS_FLAGS[k] = saved[k];
+} catch (e) {}
+function saveVisFlags() { try { localStorage.setItem("radar_vis_flags_v1", JSON.stringify(VIS_FLAGS)); } catch (e) {} }
+function courseToward(lat, lon, heading, km) {
+  if (lat == null || heading == null) return null;
+  const [plat, plon] = destPoint(lat, lon, heading, km || 25);
+  let best = null, bestD = Infinity;
+  for (const s of KYIV_OBLAST_SETTLEMENTS) {
+    const d = haversineKm(plat, plon, s[1], s[2]);
+    if (d < bestD) { bestD = d; best = s; }
+  }
+  return best && bestD < 20 ? best[0] : null;
+}
+function setActiveMarkerPulse(kind, key, on) {
+  let marker = null;
+  if (kind === "msg") { const c = State.trails.get(key); if (c && c.markerRef) marker = c.markerRef.marker; }
+  else if (kind === "api") { const t = State.tracks.get(key); if (t) marker = t.marker; }
+  if (!marker) return;
+  try {
+    const el = marker.getElement(); if (!el) return;
+    const inner = el.querySelector(".threat-icon");
+    if (inner) inner.classList.toggle("marker-active-pulse", !!on);
+  } catch (e) {}
+}
+function redrawAllIcons() {
+  try { _iconCache.clear(); } catch (e) {}
+  for (const tr of State.tracks.values()) {
+    if (!tr.marker || !tr.threat) continue;
+    try { tr.marker.setIcon(makeIcon(tr.threat, tr._s?.hdg || tr.heading, 0, 0, false, false, null, null, false, false, false, tr._s?.spd || tr.speed)); } catch (e) {}
+  }
+  for (const chain of State.trails.values()) {
+    if (!chain.markerRef || !chain.markerRef.marker || !chain.cls) continue;
+    try {
+      chain.markerRef.marker.setIcon(makeIcon(chain.cls, chain.heading, 1, totalWeightOf(chain.channels), false, false, null, null, false, false, false, chain.speedLive || 0));
+    } catch (e) {}
+  }
+}
+window.redrawAllIcons = redrawAllIcons;
+function deactivateMarker() {
+  if (!activeMarkerKey) return;
+  try { setActiveMarkerPulse(activeMarkerType, activeMarkerKey, false); } catch (e) {}
+  activeMarkerKey = null;
+  activeMarkerType = null;
+  setTimeout(() => { try { redrawAllIcons(); } catch (e) {} }, 0);
+  updateBottomCard();
+}
+function activateMarker(kind, key) {
+  if (activeMarkerKey === key && activeMarkerType === kind) { deactivateMarker(); return; }
+  deactivateMarker();
+  activeMarkerKey = key; activeMarkerType = kind;
+  setTimeout(() => { try { redrawAllIcons(); } catch (e) {} }, 0);
+  try { setActiveMarkerPulse(kind, key, true); } catch (e) {}
+  updateBottomCard();
+}
+window.activateMarker = activateMarker;
+window.deactivateMarker = deactivateMarker;
+
+function updateDescentBanner() {
+  // спрощено — не використовується
+}
+function updateBottomCard() {
+  const card = $("bottomCard"); if (!card) return;
+  if (!VIS_FLAGS.card) { card.classList.remove("show"); document.body.classList.remove("card-on"); return; }
+  card.classList.add("show");
+  document.body.classList.add("card-on");
+  const dot = $("bcDot"), txt = $("bcText"), num = $("bcEtaNum"), unit = $("bcEtaUnit");
+  const altVal = $("bcAltVal"), altChip = $("bcAltChip");
+  const spdVal = $("bcSpdVal"), spdChip = $("bcSpdChip");
+  const distVal = $("bcDistVal"), distChip = $("bcDistChip");
+  const timeVal = $("bcTimeVal"), timeChip = $("bcTimeChip");
+  const infoPlace = $("bcInfoPlace"), infoId = $("bcInfoId");
+  if (!dot || !txt || !num || !unit) return;
+
+  let best = null, bestEta = Infinity;
+  let activeAlt = null, activeSpd = null, activeDist = null, activeTime = null;
+  let activePlace = null, activeTrackId = null;
+
+  if (activeMarkerType === "msg" && activeMarkerKey) {
+    const chain = State.trails.get(activeMarkerKey);
+    if (chain && chain.points.length) {
+      const last = chain.points[chain.points.length - 1];
+      const d = distToKyiv(last.lat, last.lon);
+      const eta = d / (chain.speedLive || 180) * 60;
+      best = { id: chain._trackId, etaMin: eta };
+      bestEta = eta;
+      activeAlt = chain.altitude;
+      activeSpd = chain.speedLive;
+      activeDist = d;
+      activeTime = chain.firstSeen;
+      activePlace = last.name;
+      activeTrackId = chain._trackId;
+    }
+  } else if (activeMarkerType === "api" && activeMarkerKey) {
+    const tr = State.tracks.get(activeMarkerKey);
+    if (tr && tr.marker) {
+      const ll = tr.marker.getLatLng();
+      const d = distToKyiv(ll.lat, ll.lng);
+      const eta = d / (tr.speed || 180) * 60;
+      best = { id: tr.threat._trackId, etaMin: eta };
+      activeAlt = tr.threat._altitude;
+      activeSpd = Math.round(tr._s?.spd || tr.speed || 0);
+      activeDist = d;
+      activeTime = Date.now();
+      activePlace = tr.threat.locality || tr.threat.region;
+      activeTrackId = tr.threat._trackId;
+    }
+  }
+
+  if (!best) {
+    let nearChain = null, nearD = Infinity;
+    for (const chain of State.trails.values()) {
+      if (!chain.points.length) continue;
+      const last = chain.points[chain.points.length - 1];
+      const d = distToKyiv(last.lat, last.lon);
+      if (d < nearD) { nearD = d; nearChain = chain; }
+    }
+    if (nearChain) {
+      const last = nearChain.points[nearChain.points.length - 1];
+      best = { id: nearChain._trackId, etaMin: nearD / (nearChain.speedLive || 180) * 60 };
+      activeAlt = nearChain.altitude;
+      activeSpd = nearChain.speedLive;
+      activeDist = nearD;
+      activeTime = nearChain.firstSeen;
+      activePlace = last.name;
+      activeTrackId = nearChain._trackId;
+    }
+  }
+
+  if (altChip && altVal) { if (activeAlt != null) { altVal.textContent = formatAlt(activeAlt); altChip.className = "kv alt"; } else { altVal.textContent = "—"; altChip.className = "kv alt empty"; } }
+  if (spdChip && spdVal) { if (activeSpd != null && activeSpd > 0) { spdVal.textContent = Math.round(activeSpd) + " км/год"; spdChip.className = "kv spd"; } else { spdVal.textContent = "—"; spdChip.className = "kv spd empty"; } }
+  if (distChip && distVal) { if (activeDist != null && activeDist > 0) { distVal.textContent = Math.round(activeDist) + " км"; distChip.className = "kv dist"; } else { distVal.textContent = "—"; distChip.className = "kv dist empty"; } }
+  if (timeChip && timeVal) { if (activeTime != null) { timeVal.textContent = new Date(activeTime).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }); timeChip.className = "kv time"; } else { timeVal.textContent = "—"; timeChip.className = "kv time empty"; } }
+  if (infoPlace) infoPlace.textContent = activePlace ? "📍 " + activePlace : "📍 —";
+  if (infoId) { if (activeTrackId) { infoId.textContent = "🏷 #" + activeTrackId; infoId.style.display = "inline-flex"; } else infoId.style.display = "none"; }
+
+  if (!best) {
+    dot.className = "bc-dot safe"; txt.innerHTML = "Загроз не видно";
+    num.textContent = "—"; num.classList.remove("crit"); unit.classList.remove("crit");
+    return;
+  }
+  const etaTxt = best.etaMin < 1 ? "~1" : (best.etaMin < 60 ? "~" + Math.round(best.etaMin) : "~" + Math.floor(best.etaMin/60) + "г");
+  num.textContent = etaTxt;
+  const crit = best.etaMin < 5;
+  num.classList.toggle("crit", crit); unit.classList.toggle("crit", crit);
+  if (best.etaMin < 5) { dot.className = "bc-dot crit"; txt.innerHTML = `Ціль <b>#${best.id}</b><br>уже над містом`; unit.textContent = "хв"; }
+  else if (best.etaMin < 30) { dot.className = "bc-dot warn"; txt.innerHTML = `Ціль <b>#${best.id}</b><br>прямує до міста`; unit.textContent = "хв до міста"; }
+  else { dot.className = "bc-dot safe"; txt.innerHTML = `Ціль <b>#${best.id}</b><br>на підльоті`; unit.textContent = "хв до міста"; }
+}
+function refreshAllVisuals() { updateBottomCard(); }
+
+/* ============ 22. NET ============ */
+const Net = (() => {
+  let ws = null, wsConnected = false, pollTimer = null, abortCtrl = null;
+  function connect() {
+    try {
+      if (ws) try { ws.close(); } catch (e) {}
+      ws = new WebSocket(CONFIG.WS_URL);
+      ws.onopen = () => { wsConnected = true; updateBadge("ok"); fetchThreatsAndAlerts(); fetchMessages(); };
+      ws.onmessage = e => { try { handleFrame(JSON.parse(e.data)); } catch (err) {} };
+      ws.onclose = () => { wsConnected = false; updateBadge("err"); setTimeout(connect, 3000); if (!pollTimer) startPolling(); };
+      ws.onerror = () => {};
+    } catch (e) { setTimeout(connect, 5000); startPolling(); }
+  }
+  function handleFrame(env) {
+    if (!env || !env.type) return;
+    if (env.type === "snapshot" || env.type === "upsert") {
+      const list = env.data?.threats || (env.data ? [env.data] : []);
+      if (list.length) syncThreats(list);
+    } else if (env.type === "remove") {
+      if (env.data?.id) State.removeTrackInternal(env.data.id);
+    } else if (env.type === "alerts") {
+      try { syncAlertPolygons(env.data); } catch (e) {}
+    }
+  }
+  async function fetchMessages() {
+    try {
+      const r = await fetch(CONFIG.API_MESSAGES);
+      if (!r.ok) return;
+      const d = await r.json();
+      syncMessageThreats(d.messages || []);
+    } catch (e) {}
+  }
+  async function fetchThreatsAndAlerts() {
+    try {
+      const [tr, al] = await Promise.all([
+        fetch(CONFIG.API_THREATS).then(r => r.json()).catch(() => ({})),
+        fetch(CONFIG.API_ALERTS).then(r => r.json()).catch(() => ({}))
+      ]);
+      if (tr.threats) syncThreats(tr.threats);
+      if (al) try { syncAlertPolygons(al); } catch (e) {}
+    } catch (e) {}
+  }
+  async function pollLoop() {
+    await fetchThreatsAndAlerts();
+    await fetchMessages();
+    pollTimer = setTimeout(pollLoop, CONFIG.POLL_MS);
+  }
+  function startPolling() { if (pollTimer) clearTimeout(pollTimer); pollLoop(); }
+  function stopPolling() { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; } }
+  function updateBadge(state) {
+    if (state === "ok") setStatus(wsConnected ? "ok" : "warn", wsConnected ? "ONLINE · WS" : "ONLINE");
+    else setStatus("err", "ОФЛАЙН");
+  }
+  return { connect, startPolling, stopPolling, fetchMessages, isConnected: () => wsConnected };
+})();
+let alertLayers = [];
+function syncAlertPolygons(alerts) {
+  if (!alerts) return;
+  for (const l of alertLayers) { try { alertLayer.removeLayer(l); } catch (e) {} }
+  alertLayers = [];
+  const allLists = [...(alerts.raions||[]), ...(alerts.oblasts||[]), ...(alerts.regions||[])];
+  for (const a of allLists) {
+    let latlngs = null;
+    try {
+      if (a.geometry?.type === "Polygon") latlngs = a.geometry.coordinates.map(r => r.map(c => [c[1], c[0]]));
+      else if (a.coords) latlngs = a.coords.map(c => [c[1], c[0]]);
+      else if (a.polygon) latlngs = a.polygon.map(c => [c[1], c[0]]);
+    } catch (e) { continue; }
+    if (!latlngs) continue;
+    const name = String(a.name||"") + " " + String(a.key||"");
+    const color = isKyivOrOblast(name) ? "#dc2626" : "#ea580c";
+    try {
+      const layer = L.polygon(latlngs, { color, weight: 1.5, opacity: .8, fillColor: color, fillOpacity: .15 });
+      layer.addTo(alertLayer);
+      alertLayers.push(layer);
+    } catch (e) {}
+  }
+}
+
+/* ============ 23. ANIMATION ============ */
+let animRunning = false, rafId = null;
+function animate() {
+  if (!animRunning || !map) return;
+  const now = Date.now();
+  for (const tr of State.tracks.values()) {
+    if (!tr._s || !tr.marker) continue;
+    const dt = Math.min((now - tr._s.lastT) / 3600000, CONFIG.EXTRAPOLATION_HOURS);
+    const spd = tr._s.spd > 5 ? tr._s.spd : tr.speed;
+    const dist = spd * dt;
+    const [lat, lon] = destPoint(tr._s.lat, tr._s.lon, tr._s.hdg, dist);
+    tr.marker.setLatLng([lat, lon]);
+  }
+  rafId = requestAnimationFrame(animate);
+}
+function startAnim() { if (animRunning) return; animRunning = true; rafId = requestAnimationFrame(animate); }
+function stopAnim() { animRunning = false; if (rafId) { cancelAnimationFrame(rafId); rafId = null; } }
+
+/* ============ 24. GEOLOCATION ============ */
+const GeoLoc = (() => {
+  let watchId = null, marker = null, enabled = false, lastCoords = null;
+  function onPosition(pos) {
+    const lat = pos.coords.latitude, lon = pos.coords.longitude;
+    lastCoords = { lat, lon };
+    if (!marker) { marker = L.marker([lat, lon], { icon: L.divIcon({ className:"", html:'<div class="user-loc-marker"><div class="user-loc-dot"></div></div>', iconSize:[22,22], iconAnchor:[11,11] }), zIndexOffset: 3000 }).addTo(map); }
+    else marker.setLatLng([lat, lon]);
+  }
+  function start() {
+    if (!("geolocation" in navigator)) return;
+    if (watchId != null) return;
+    watchId = navigator.geolocation.watchPosition(onPosition, () => {}, { enableHighAccuracy: true });
+    enabled = true;
+    $("btnGeo")?.classList.add("on");
+    showToast("🧭 Увімкнено");
+  }
+  function stop() {
+    if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    enabled = false;
+    $("btnGeo")?.classList.remove("on");
+    if (marker && map) { map.removeLayer(marker); marker = null; }
+    showToast("🧭 Вимкнено");
+  }
+  function toggle() { enabled ? stop() : start(); }
+  function center() { if (lastCoords) map.setView([lastCoords.lat, lastCoords.lon], 14); }
+  return { start, stop, toggle, center, isEnabled: () => enabled, getLast: () => lastCoords };
+})();
+window.GeoLoc = GeoLoc;
+
+/* ============ 25. UI ============ */
+function setStatus(state, text) {
+  const dot = $("statusDot"), tt = $("statusText");
+  if (!dot || !tt) return;
+  dot.className = "status-dot" + (state === "err" ? " err" : state === "warn" ? " warn" : "");
+  tt.textContent = text || "ONLINE";
+}
+function applyScopeMode(flyTo) {
+  if (!map) return;
+  if (Scope.isUkraine()) map.setView([48.5, 31.0], 6);
+  else map.setView(CONFIG.KYIV, 6);
+  const b = $("btnScope");
+  if (b) b.textContent = Scope.isUkraine() ? "🇺🇦" : "🌍";
+}
+function toggleScope() {
+  Scope.set(Scope.isUkraine() ? "kyiv" : "ukraine");
+  applyScopeMode(true);
+  showToast(Scope.isUkraine() ? "🇺🇦 Вся Україна" : "🎯 Київ + 250 км");
+}
+function initUI() {
+  $("btnRefresh").addEventListener("click", () => { RadarAudio.unlock(); Net.fetchMessages(); showToast("Оновлення…"); });
+  $("btnClear").addEventListener("click", () => { RadarAudio.unlock(); State.clearAll(); showToast("Очищено"); });
+  $("btnQuickStatus").addEventListener("click", () => { RadarAudio.unlock(); showToast("📊 Загроз: " + State.tracks.size + " · Треків: " + State.trails.size); });
+  $("btnScope").addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); RadarAudio.unlock(); toggleScope(); });
+  $("topAlertClose").addEventListener("click", () => Alerts.hideTopAlert());
+  $("massBannerClose").addEventListener("click", () => Mass.hideBanner());
+  $("strategicPanelClose").addEventListener("click", () => { $("strategicPanel").classList.remove("show"); });
+  (function soundBtn() {
+    const b = $("soundToggle"); if (!b) return;
+    function update() { b.textContent = CONFIG.SOUND_ENABLED ? "🔔" : "🔕"; b.className = "sound-btn " + (CONFIG.SOUND_ENABLED ? "on" : "muted"); }
+    update();
+    b.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); RadarAudio.unlock(); CONFIG.SOUND_ENABLED = !CONFIG.SOUND_ENABLED; update(); showToast(CONFIG.SOUND_ENABLED ? "🔔 увімк" : "🔕 вимк"); });
+  })();
+  $("sirenBtn").addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); RadarAudio.unlock(); RadarAudio.triggerSirenSequence(3000, 1); showToast("🚨 Тест"); });
+  (function ringsBtn() {
+    const b = $("btnRingsToggle"); if (!b || !map) return;
+    b.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); ringsVisible = !ringsVisible; if (ringsVisible) ringsLayer.addTo(map); else map.removeLayer(ringsLayer); b.classList.toggle("on", ringsVisible); });
+  })();
+  (function mapBtn() {
+    const b = $("btnMapToggle"); if (!b || !map) return;
+    const bases = ["sat","osm","omt"]; let idx = 0;
+    function apply() {
+      if (map.hasLayer(baseSat)) map.removeLayer(baseSat);
+      if (map.hasLayer(osmLayer)) map.removeLayer(osmLayer);
+      if (map.hasLayer(openMapTilesLayer)) map.removeLayer(openMapTilesLayer);
+      if (bases[idx] === "sat") baseSat.addTo(map);
+      else if (bases[idx] === "osm") osmLayer.addTo(map);
+      else openMapTilesLayer.addTo(map);
+      b.textContent = { sat:"🛰", osm:"🗺", omt:"🌍" }[bases[idx]];
+    }
+    apply();
+    b.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); idx = (idx+1)%3; apply(); });
+  })();
+  $("btnSettlements").addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); toggleSettlementsLayer(); });
+  $("btnStrategic").addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); toggleStrategicLayer(); });
+  $("btnInfra").addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); cycleInfraMode(); });
+  $("btnPower").addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); togglePowerLayer(); });
+  $("btnMass").addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); Mass.hideBanner(); });
+  $("btnVisual").addEventListener("click", e => {
+    e.preventDefault(); e.stopPropagation();
+    const allOn = Object.values(VIS_FLAGS).every(v => v);
+    for (const k of Object.keys(VIS_FLAGS)) VIS_FLAGS[k] = !allOn;
+    saveVisFlags();
+    document.body.classList.toggle("card-on", VIS_FLAGS.card);
+    const card = $("bottomCard"); if (card) card.classList.toggle("show", VIS_FLAGS.card);
+    redrawAllIcons();
+    updateBottomCard();
+  });
+  $("btnGeo").addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); GeoLoc.toggle(); });
+  $("btnFullscreen").addEventListener("click", e => {
+    e.preventDefault(); e.stopPropagation();
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen?.().catch(()=>{});
+  });
+  document.addEventListener("click", e => {
+    const btn = e.target.closest(".popup-remove-btn");
+    if (!btn) return;
+    e.preventDefault(); e.stopPropagation();
+    const kind = btn.getAttribute("data-remove-kind"), key = btn.getAttribute("data-remove-key");
+    if (kind && key) { removeMarkerByKey(kind, key); try { map.closePopup(); } catch (_) {} }
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopAnim();
+    else startAnim();
+  });
+}
+
+function initSearch() {
+  const input = $("searchInput"), btn = $("searchBtn"), results = $("searchResults");
+  if (!input || !btn || !results) return;
+  function hideResults() { results.classList.remove("show"); }
+  btn.addEventListener("click", async e => {
+    e.preventDefault();
+    const q = input.value.trim();
+    if (q.length < 2) return;
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=8&countrycodes=ua&accept-language=uk`;
+      const data = await (await fetch(url)).json();
+      results.innerHTML = (data||[]).map((d,i) => `<div class="search-item" data-i="${i}"><div class="name">${esc(d.display_name.split(",")[0])}</div><div class="addr">${esc(d.display_name)}</div></div>`).join("");
+      results.classList.add("show");
+      results.querySelectorAll(".search-item").forEach(el => el.addEventListener("click", () => {
+        const it = data[+el.dataset.i];
+        if (it) { map.setView([+it.lat, +it.lon], 14); hideResults(); }
+      }));
+    } catch (err) { showToast("Помилка пошуку"); }
+  });
+}
+
+/* ============ 26. INIT ============ */
+async function init() {
+  try {
+    loadSettings();
+    initMap();
+    if (!map) { RadarLog.showBanner("Карта не завантажилась"); return; }
+    initUI();
+    initSearch();
+    applyScopeMode(false);
+    Net.connect();
+    Net.fetchMessages();
+    setInterval(Net.fetchMessages, 5000);
+    startAnim();
+    setTimeout(() => RadarAudio.unlock(), 500);
+    const b = $("btnInfra");
+    if (b) { b.classList.remove("on","infrastructure","energy","incidents"); if (infraMode===1) b.classList.add("infrastructure"); else if (infraMode===2) b.classList.add("energy"); else if (infraMode===4) b.classList.add("on"); }
+    if (infraMode > 0) rebuildInfraLayer();
+    if (powerVisible) rebuildPowerLayer();
+    document.body.classList.toggle("card-on", VIS_FLAGS.card);
+    const bc = $("bottomCard"); if (bc) bc.classList.toggle("show", VIS_FLAGS.card);
+    updateBottomCard();
+    console.log("[radar] ready v16.3");
+  } catch (e) { RadarLog.showBanner("init: " + (e.message || e)); }
+}
+function loadSettings() {
+  try { if (localStorage.getItem("kyiv_rings_v41") === "1") ringsVisible = true; } catch (e) {}
+  try { if (localStorage.getItem("kyiv_settlements_v41") === "1") settlementsVisible = true; } catch (e) {}
+  try { if (localStorage.getItem("kyiv_strategic_v41") === "1") strategicVisible = true; } catch (e) {}
+  try { const v = localStorage.getItem("kyiv_infra_mode_v41"); if (v != null) { const i = +v; if (i >= 0 && i <= 4) infraMode = i; } } catch (e) {}
+  try { if (localStorage.getItem("kyiv_power_vis_v1") === "1") powerVisible = true; } catch (e) {}
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+else init();
+</script>
+</body>
+</html>
